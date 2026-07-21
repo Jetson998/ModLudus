@@ -14,6 +14,10 @@ MVP 默认采用 Web Privacy Mode：浏览器直接调用用户配置的 OpenAI-
 
 所有 Run 冻结模型、参数、Prompt、Rubric 和价格快照；重试创建新 Attempt，不覆盖原始证据。
 
+M2 浏览器批量模式将 `BatchTestCase`、`RubricSnapshot`、候选 Attempt、结构化 JudgeVerdict 和 HumanReview 状态保存在 React 内存。CSV/JSONL 最大 50 题，题目串行执行、题内候选并行。导出器直接在浏览器生成 JSON、CSV 或单文件 HTML，不经过 API。
+
+裁判 JSON 必须满足：winner 属于成功候选；scores 完整且仅覆盖全部成功候选；置信度和分数均限制在合法区间。不满足时进入人工抽检队列，不作为可信质量分。
+
 ## 开源边界
 
 - LiteLLM：统一 OpenAI-compatible 连接、重试、Token/价格统计

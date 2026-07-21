@@ -58,7 +58,7 @@ function clampScore(value: unknown, maximum = 100) {
   return Math.min(maximum, Math.max(0, parsed));
 }
 
-export function parseJudgeVerdict(content: string): StructuredJudgeVerdict | null {
+export function parseJudgeVerdict(content: string, allowedAliases?: string[]): StructuredJudgeVerdict | null {
   const start = content.indexOf('{');
   const end = content.lastIndexOf('}');
   if (start < 0 || end <= start) return null;
@@ -77,6 +77,12 @@ export function parseJudgeVerdict(content: string): StructuredJudgeVerdict | nul
       severeIssues: Array.isArray(item.severeIssues) ? item.severeIssues.map(String) : [],
     })).filter((item: JudgeScore) => item.alias);
     if (!scores.length) return null;
+    if (allowedAliases) {
+      const expected = [...new Set(allowedAliases)].sort();
+      const actual = [...new Set(scores.map((item: JudgeScore) => item.alias))].sort();
+      if (!expected.includes(String(parsed.winner))) return null;
+      if (expected.length !== actual.length || expected.some((alias, index) => alias !== actual[index])) return null;
+    }
     return {
       winner: String(parsed.winner),
       confidence: clampScore(parsed.confidence, 1),

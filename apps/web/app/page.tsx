@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { dedupeCandidates, estimateCostUsd, fisherYatesShuffle, parseJudgeVerdict, selectionRecommendations, StructuredJudgeVerdict, uniqueModels } from './arena-utils';
+import BatchLab from './batch-lab';
 
 type Connection = {
   id: number;
@@ -179,7 +180,7 @@ export default function Home() {
     }
   }
 
-  async function callModel(connection: Connection, model: string, content: string, temperature = 0.7) {
+  async function callModel(connection: Pick<Connection, 'id' | 'name' | 'endpoint' | 'apiKey'>, model: string, content: string, temperature = 0.7) {
     const startedAt = performance.now();
     const response = await fetch(`${normalizeBaseUrl(connection.endpoint)}/v1/chat/completions`, {
       method: 'POST',
@@ -283,7 +284,7 @@ export default function Home() {
         try {
           const verdict = await callModel(judgeConnection, judgeModel.trim(), judgePrompt, 0);
           setJudgeVerdict(verdict.content);
-          const structured = parseJudgeVerdict(verdict.content);
+          const structured = parseJudgeVerdict(verdict.content, successful.map((item) => item.alias));
           setJudgeReport(structured);
           if (!structured) judgeFailureNote = '裁判返回内容无法结构化，已保留原文并等待人工复核。';
         } catch (error) {
@@ -309,7 +310,7 @@ export default function Home() {
     <main className="shell">
       <nav className="topbar"><div className="brand"><span className="brand-mark">M</span><span>ModLudus</span></div><span className="status"><i /> 隐私模式 · 不存 Key 与测评集</span></nav>
 
-      <section className="hero"><div className="eyebrow">REAL TASK MODEL ARENA</div><h1>让模型用同一道题<br /><em>自己证明谁更适合。</em></h1><p>输入一条真实业务需求，跨网关匿名并行调用多个模型，交给独立裁判比较质量、成本与速度。</p><div className="hero-actions"><a href="#arena" className="primary-button">开始一次快速竞技 <span>↗</span></a><a href="#ladder" className="text-link">查看模型天梯 ↓</a></div></section>
+      <section className="hero"><div className="eyebrow">REAL TASK MODEL ARENA</div><h1>让模型用同一道题<br /><em>自己证明谁更适合。</em></h1><p>输入一条真实业务需求，跨网关匿名并行调用多个模型，交给独立裁判比较质量、成本与速度。</p><div className="hero-actions"><a href="#arena" className="primary-button">开始一次快速竞技 <span>↗</span></a><a href="#batch" className="text-link">进入批量评测 ↓</a><a href="#ladder" className="text-link">模型天梯 ↓</a></div></section>
 
       <section id="arena" className="arena-card">
         <div className="card-heading"><div><span className="section-kicker">01 / QUICK ARENA</span><h2>发起一场竞技</h2></div><span className="draft-pill">浏览器直连</span></div>
@@ -333,6 +334,8 @@ export default function Home() {
 
       {results.length > 0 && <section className="results-section"><div className="result-heading"><div><span className="section-kicker">RESULT / BLIND REVIEW</span><h2>匿名候选答案</h2></div><button className="outline-button" onClick={() => setRevealed(!revealed)}>{revealed ? '隐藏身份' : '揭晓模型'}</button></div><div className="result-grid">{results.map((item) => <article className={item.failed ? 'result-card failed' : 'result-card'} key={item.alias}><div className="result-meta"><strong>{item.failed ? '调用失败' : `答案 ${item.alias}`}</strong><span>{revealed ? `${item.connectionName} / ${item.model}` : '模型身份已隐藏'}</span></div><pre>{item.content}</pre><div className="metrics">{item.failed ? <span>不参与裁判</span> : <><span>{item.latencyMs} ms</span><span>输入 {item.inputTokens ?? '—'} tokens</span><span>输出 {item.outputTokens ?? '—'} tokens</span><span>参考成本 {item.estimatedCostUsd === undefined ? '—' : `$${item.estimatedCostUsd.toFixed(6)}`}</span></>}</div>{!item.failed && <button className={humanReviewed.includes(item.alias) ? 'review-button reviewed' : 'review-button'} onClick={() => toggleHumanReview(item.alias)}>{humanReviewed.includes(item.alias) ? '✓ 已人工复核' : '标记人工复核'}</button>}</article>)}</div>{judgeReport && <article className="verdict-card"><div className="verdict-head"><div><span className="section-kicker">STRUCTURED JUDGE</span><h3>裁判胜者：答案 {judgeReport.winner}</h3></div><strong className={judgeReport.confidence < 0.7 ? 'confidence low' : 'confidence'}>置信度 {(judgeReport.confidence * 100).toFixed(0)}%</strong></div><p>{judgeReport.summary}</p><div className="judge-score-grid">{judgeReport.scores.map((score) => <div key={score.alias}><strong>答案 {score.alias} · {score.total}</strong><small>遵循 {score.instruction} / 正确 {score.correctness} / 完整 {score.completeness} / 表达 {score.expression} / 可执行 {score.actionability}</small>{score.severeIssues.length > 0 && <small className="issues">严重问题：{score.severeIssues.join('；')}</small>}</div>)}</div>{judgeReport.confidence < 0.7 && <div className="review-alert">低置信度样本：建议至少复核胜者及一个对照答案。</div>}</article>}{!judgeReport && judgeVerdict && <article className="verdict-card"><span className="section-kicker">JUDGE RAW OUTPUT</span><h3>裁判原始意见 · 待人工复核</h3><pre>{judgeVerdict}</pre></article>}{selection && <article className="selection-card"><span className="section-kicker">SMART SELECTION</span><h3>本次选型结论</h3><div className="selection-grid"><div><small>质量优先</small><strong>{selection.quality ? `答案 ${selection.quality.alias}` : '等待结构化评分'}</strong></div><div><small>成本优先</small><strong>{selection.cost ? `答案 ${selection.cost.alias}` : '暂无匹配价格'}</strong></div><div><small>速度优先</small><strong>{selection.speed ? `答案 ${selection.speed.alias}` : '—'}</strong></div></div><p>Pareto 候选：{selection.pareto.length ? selection.pareto.map((alias) => `答案 ${alias}`).join('、') : '暂无'}。成本为 OpenRouter 公开参考价估算，不代表供应商账单。</p></article>}</section>}
       {results.some((item) => item.priceCapturedAt) && <div className="price-snapshot-note">价格来源：OpenRouter Models · 运行快照：{results.find((item) => item.priceCapturedAt)?.priceCapturedAt?.replace('T', ' ').slice(0, 19)} UTC · 历史结果不会随参考价更新而变化</div>}
+
+      <BatchLab connections={connections} judgeConnectionId={judgeConnectionId} judgeModel={judgeModel} referencePrices={referencePrices} callModel={callModel} />
 
       <section id="ladder" className="ladder-section"><div className="ladder-copy"><span className="section-kicker">02 / MODEL LADDER</span><h2>模型天梯</h2><p>榜单只展示聚合后的匿名评测指标。当前为界面演示数据；正式上线后区分社区体验榜和使用标准测试集的赛季榜。</p><div className="privacy-list"><span>✓ 不收集 API Key</span><span>✓ 不收集 Base URL</span><span>✓ 不收集题目与答案</span><span>✓ 用户主动选择是否贡献</span></div></div><div className="ladder-card"><div className="ladder-header"><span>综合排名</span><span>社区体验榜 · 演示</span></div>{leaderboard.map((item) => <div className="ladder-row" key={item.rank}><strong className="rank">{String(item.rank).padStart(2, '0')}</strong><div className="model-name"><strong>{item.model}</strong><small>{item.samples.toLocaleString()} 次匿名样本</small></div><div className="score-bar"><i style={{ width: `${item.score}%` }} /><span>质量 {item.quality} · 速度 {item.speed}</span></div><strong className="score">{item.score}</strong></div>)}</div></section>
 
