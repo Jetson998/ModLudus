@@ -1,0 +1,23 @@
+{
+  "name": "modludus-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node node_modules/next/dist/bin/next dev",
+    "build": "NEXT_DIST_DIR=.next-build node node_modules/next/dist/bin/next build",
+    "start": "NEXT_DIST_DIR=.next-build node node_modules/next/dist/bin/next start",
+    "test": "node --test --experimental-strip-types tests/*.test.ts",
+    "verify": "npm run test && npm run build"
+  },
+  "dependencies": {
+    "next": "^15.5.20",
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.21",
+    "@types/react": "19.1.2",
+    "@types/react-dom": "19.1.2",
+    "typescript": "5.8.3"
+  }
+}
