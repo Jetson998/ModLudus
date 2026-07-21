@@ -108,7 +108,7 @@ export function validateDataset(items: BatchTestCase[]) {
   return items;
 }
 
-function fingerprint(value: string) {
+export function stableFingerprint(value: string) {
   let hash = 2166136261;
   for (let index = 0; index < value.length; index += 1) {
     hash ^= value.charCodeAt(index);
@@ -123,19 +123,19 @@ export function createRubricSnapshot(name: string, version: string, dimensions: 
   const totalWeight = dimensions.reduce((total, item) => total + item.weight, 0);
   if (Math.abs(totalWeight - 100) > 0.001) throw new Error(`Rubric 权重合计必须为 100，当前为 ${totalWeight}。`);
   const normalized = dimensions.map((item) => ({ ...item, name: item.name.trim(), description: item.description.trim() }));
-  return { name: name.trim(), version: version.trim(), dimensions: normalized, capturedAt, fingerprint: fingerprint(JSON.stringify({ name: name.trim(), version: version.trim(), dimensions: normalized })) };
+  return { name: name.trim(), version: version.trim(), dimensions: normalized, capturedAt, fingerprint: stableFingerprint(JSON.stringify({ name: name.trim(), version: version.trim(), dimensions: normalized })) };
 }
 
 export function shouldSampleForReview(caseId: string, confidence: number | undefined, hasFailure: boolean, judgeValid: boolean, sampleRate = 0.2) {
   if (hasFailure || !judgeValid || confidence === undefined || confidence < 0.7) return true;
-  const bucket = Number.parseInt(fingerprint(caseId).slice(0, 6), 16) / 0xffffff;
+  const bucket = Number.parseInt(stableFingerprint(caseId).slice(0, 6), 16) / 0xffffff;
   return bucket < sampleRate;
 }
 
 export function selectReviewCaseIds(items: Array<{ id: string; confidence?: number; hasFailure: boolean; judgeValid: boolean }>, sampleRate = 0.2) {
   const selected = new Set(items.filter((item) => item.hasFailure || !item.judgeValid || item.confidence === undefined || item.confidence < 0.7).map((item) => item.id));
   const target = Math.max(selected.size, Math.ceil(items.length * sampleRate));
-  const eligible = items.filter((item) => !selected.has(item.id)).sort((a, b) => fingerprint(a.id).localeCompare(fingerprint(b.id)));
+  const eligible = items.filter((item) => !selected.has(item.id)).sort((a, b) => stableFingerprint(a.id).localeCompare(stableFingerprint(b.id)));
   for (const item of eligible) {
     if (selected.size >= target) break;
     selected.add(item.id);

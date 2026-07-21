@@ -14,7 +14,9 @@ MVP 默认采用 Web Privacy Mode：浏览器直接调用用户配置的 OpenAI-
 
 所有 Run 冻结模型、参数、Prompt、Rubric 和价格快照；重试创建新 Attempt，不覆盖原始证据。
 
-M2 浏览器批量模式将 `BatchTestCase`、`RubricSnapshot`、候选 Attempt、结构化 JudgeVerdict 和 HumanReview 状态保存在 React 内存。CSV/JSONL 最大 50 题，题目串行执行、题内候选并行。导出器直接在浏览器生成 JSON、CSV 或单文件 HTML，不经过 API。
+M3.1 浏览器批量模式使用 `AbortController` 取消在途 fetch，使用有界 worker pool 将题目并发限制为 1–4，题内候选仍并行。实际瞬时压力约为“题目并发 × 候选模型数”，裁判在候选完成后调用。
+
+跨刷新恢复点保存在当前标签页 Session Storage，只包含数据集/配置指纹、配置随机盐、Rubric、任务状态、评分、Token、延迟、参考成本和复核状态。配置指纹纳入规范化 Base URL 的加盐哈希，以识别同名模型更换网关的情况；恢复点不包含 API Key、Base URL 原文、题目、参考答案、候选输出或裁判原文。续跑前必须重新导入匹配数据集并提供连接凭据。导出器仍直接在浏览器生成 JSON、CSV 或单文件 HTML，不经过 API。
 
 裁判 JSON 必须满足：winner 属于成功候选；scores 完整且仅覆盖全部成功候选；置信度和分数均限制在合法区间。不满足时进入人工抽检队列，不作为可信质量分。
 
