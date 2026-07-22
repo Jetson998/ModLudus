@@ -21,6 +21,8 @@ ModLudus 是一个基于真实业务任务的多模型竞技与智能选型平�
 - 批量任务可取消在途模型/裁判请求，题目并发可在 1–4 之间调整
 - 刷新后可恢复脱敏进度；需重新导入原测试集并填写网关凭据，指纹不匹配时禁止续跑
 - 内置标准赛季 `2026.1` 八道基准题，覆盖文案、代码、总结和数据分析
+- 服务端可信赛季冻结测试集、Rubric、模型与价格配置，生成不可变证据哈希
+- 完成报告使用 Ed25519 签名，并提供公钥验签与 append-only 审计哈希链
 - 本地导出 JSON、CSV 和单文件 HTML 报告，不经过平台服务端
 - 单机 Docker Compose 部署，先支持本地预览和内部试点
 
@@ -34,6 +36,7 @@ ModLudus 是一个基于真实业务任务的多模型竞技与智能选型平�
 - 天梯数据默认不上传；当前原型的贡献开关仅作交互演示，不会发送数据
 - 后续接入贡献接口时，只允许发送模型、场景、胜负、评分和性能区间
 - 天梯贡献不包含 Base URL、Key、题目或模型答案
+- M3.2 可信赛季使用服务器管理员配置的独立模型凭据；不会读取或上传浏览器隐私模式中的用户 Key
 
 ## 天梯可信度
 
@@ -52,10 +55,37 @@ npm --prefix apps/web run dev
 
 M3.1 批量实验室复用快速竞技区的网关和裁判配置。测试集文件通过浏览器读取，支持取消、题目并发 1–4 和脱敏检查点恢复。恢复后仍需重新提供测试集、Base URL 和 Key。
 
+M3.2 可信赛季控制台调用 ModLudus API，由服务器使用部署时配置的模型凭据执行固定赛季。运行证据保存在挂载的 `evidence_data` 卷；模型输出与 Prompt 原文不进入签名报告，只记录哈希、评分、Token、延迟、成本和失败类型。
+
+服务器配置示例（实际 Key 只放服务器环境或 Secret 管理器，不提交仓库）：
+
+```json
+{
+  "providers": [{"id":"official","base_url":"https://gateway.example.com/v1","api_key":"SERVER_SECRET"}],
+  "candidates": [
+    {"provider_id":"official","model":"model-a","input_usd_per_token":0.000001,"output_usd_per_token":0.000002},
+    {"provider_id":"official","model":"model-b","input_usd_per_token":0.000001,"output_usd_per_token":0.000002}
+  ],
+  "judge": {"provider_id":"official","model":"judge-model"},
+  "concurrency": 1
+}
+```
+
+将压缩后的单行 JSON 写入 `MODLUDUS_TRUSTED_CONFIG_JSON`，然后启动服务端 profile：
+
+同时用 `MODLUDUS_TRUSTED_ENVIRONMENT` 标记 `local-e2e`、`staging` 或 `official`，并用 `MODLUDUS_TRUSTED_SIMULATED` 冻结是否为模拟运行。两者都会进入签名 Manifest 和运行记录，历史报告不会随服务器当前环境变化而改名。
+
+启动可信赛季属于付费写操作，默认必须设置 `MODLUDUS_ADMIN_TOKEN`，管理员在页面内存中临时输入令牌。只有本机验收可同时设置 `MODLUDUS_TRUSTED_ENVIRONMENT=local-e2e` 与 `MODLUDUS_LOCAL_E2E_BYPASS=true`；绕过仅接受来自回环地址的请求。不得在 staging/official 或公网代理环境开启该开关。
+
+```bash
+docker compose --profile server up --build
+```
+
 开发服务使用 `.next`，生产构建使用 `.next-build`，两者可以并行运行。完整本地校验：
 
 ```bash
 npm --prefix apps/web run verify
+PYTHONPATH=apps/api python3 -m unittest discover -s apps/api/tests -v
 ```
 
 首版竞技流程不依赖 ModLudus API 服务；API 健康检查 <http://localhost:8000/health> 为后续可选服务端能力预留。
@@ -64,7 +94,7 @@ npm --prefix apps/web run verify
 
 ```text
 apps/web     Next.js 产品界面
-apps/api     FastAPI 控制面与模型连接 API
+apps/api     FastAPI 控制面、可信赛季执行、签名证据与审计 API
 apps/api/app/worker.py  异步任务 Worker 占位
 docs/        产品、架构与执行记录
 ```

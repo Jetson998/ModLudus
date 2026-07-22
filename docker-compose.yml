@@ -16,6 +16,15 @@ services:
     environment:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       POSTGRES_DSN: postgresql://${POSTGRES_USER:-modludus}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-modludus}
+      MODLUDUS_EVIDENCE_DIR: /var/lib/modludus/evidence
+      MODLUDUS_EVIDENCE_SALT: ${MODLUDUS_EVIDENCE_SALT:-}
+      MODLUDUS_TRUSTED_ENVIRONMENT: ${MODLUDUS_TRUSTED_ENVIRONMENT:-local}
+      MODLUDUS_TRUSTED_SIMULATED: ${MODLUDUS_TRUSTED_SIMULATED:-false}
+      MODLUDUS_ADMIN_TOKEN: ${MODLUDUS_ADMIN_TOKEN:-}
+      MODLUDUS_LOCAL_E2E_BYPASS: ${MODLUDUS_LOCAL_E2E_BYPASS:-false}
+      MODLUDUS_TRUSTED_CONFIG_JSON: ${MODLUDUS_TRUSTED_CONFIG_JSON:-}
+    volumes:
+      - evidence_data:/var/lib/modludus/evidence
     depends_on:
       - postgres
       - redis
@@ -59,3 +68,4 @@ services:
 volumes:
   postgres_data:
   minio_data:
+  evidence_data:

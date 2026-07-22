@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { dedupeCandidates, estimateCostUsd, fisherYatesShuffle, parseJudgeVerdict, selectionRecommendations, StructuredJudgeVerdict, uniqueModels } from './arena-utils';
 import BatchLab from './batch-lab';
+import TrustedSeason from './trusted-season';
 
 type Connection = {
   id: number;
@@ -311,7 +312,7 @@ export default function Home() {
     <main className="shell">
       <nav className="topbar"><div className="brand"><span className="brand-mark">M</span><span>ModLudus</span></div><span className="status"><i /> 隐私模式 · 不存 Key 与测评集</span></nav>
 
-      <section className="hero"><div className="eyebrow">REAL TASK MODEL ARENA</div><h1>让模型用同一道题<br /><em>自己证明谁更适合。</em></h1><p>输入一条真实业务需求，跨网关匿名并行调用多个模型，交给独立裁判比较质量、成本与速度。</p><div className="hero-actions"><a href="#arena" className="primary-button">开始一次快速竞技 <span>↗</span></a><a href="#batch" className="text-link">进入批量评测 ↓</a><a href="#ladder" className="text-link">模型天梯 ↓</a></div></section>
+      <section className="hero"><div className="eyebrow">REAL TASK MODEL ARENA</div><h1>让模型用同一道题<br /><em>自己证明谁更适合。</em></h1><p>输入一条真实业务需求，跨网关匿名并行调用多个模型，交给独立裁判比较质量、成本与速度。</p><div className="hero-actions"><a href="#arena" className="primary-button">开始一次快速竞技 <span>↗</span></a><a href="#batch" className="text-link">进入批量评测 ↓</a><a href="#trusted-season" className="text-link">可信赛季 ↓</a><a href="#ladder" className="text-link">模型天梯 ↓</a></div></section>
 
       <section id="arena" className="arena-card">
         <div className="card-heading"><div><span className="section-kicker">01 / QUICK ARENA</span><h2>发起一场竞技</h2></div><span className="draft-pill">浏览器直连</span></div>
@@ -337,6 +338,8 @@ export default function Home() {
       {results.some((item) => item.priceCapturedAt) && <div className="price-snapshot-note">价格来源：OpenRouter Models · 运行快照：{results.find((item) => item.priceCapturedAt)?.priceCapturedAt?.replace('T', ' ').slice(0, 19)} UTC · 历史结果不会随参考价更新而变化</div>}
 
       <BatchLab connections={connections} judgeConnectionId={judgeConnectionId} judgeModel={judgeModel} referencePrices={referencePrices} callModel={callModel} />
+
+      <TrustedSeason />
 
       <section id="ladder" className="ladder-section"><div className="ladder-copy"><span className="section-kicker">02 / MODEL LADDER</span><h2>模型天梯</h2><p>榜单只展示聚合后的匿名评测指标。当前为界面演示数据；正式上线后区分社区体验榜和使用标准测试集的赛季榜。</p><div className="privacy-list"><span>✓ 不收集 API Key</span><span>✓ 不收集 Base URL</span><span>✓ 不收集题目与答案</span><span>✓ 用户主动选择是否贡献</span></div></div><div className="ladder-card"><div className="ladder-header"><span>综合排名</span><span>社区体验榜 · 演示</span></div>{leaderboard.map((item) => <div className="ladder-row" key={item.rank}><strong className="rank">{String(item.rank).padStart(2, '0')}</strong><div className="model-name"><strong>{item.model}</strong><small>{item.samples.toLocaleString()} 次匿名样本</small></div><div className="score-bar"><i style={{ width: `${item.score}%` }} /><span>质量 {item.quality} · 速度 {item.speed}</span></div><strong className="score">{item.score}</strong></div>)}</div></section>
 
