@@ -16,11 +16,13 @@ services:
     environment:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       POSTGRES_DSN: postgresql://${POSTGRES_USER:-modludus}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-modludus}
+      MODLUDUS_WEB_ORIGINS: ${MODLUDUS_WEB_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
       MODLUDUS_EVIDENCE_DIR: /var/lib/modludus/evidence
       MODLUDUS_EVIDENCE_SALT: ${MODLUDUS_EVIDENCE_SALT:-}
       MODLUDUS_TRUSTED_ENVIRONMENT: ${MODLUDUS_TRUSTED_ENVIRONMENT:-local}
       MODLUDUS_TRUSTED_SIMULATED: ${MODLUDUS_TRUSTED_SIMULATED:-false}
       MODLUDUS_ADMIN_TOKEN: ${MODLUDUS_ADMIN_TOKEN:-}
+      MODLUDUS_REVIEWER_TOKEN: ${MODLUDUS_REVIEWER_TOKEN:-}
       MODLUDUS_LOCAL_E2E_BYPASS: ${MODLUDUS_LOCAL_E2E_BYPASS:-false}
       MODLUDUS_TRUSTED_CONFIG_JSON: ${MODLUDUS_TRUSTED_CONFIG_JSON:-}
     volumes:
@@ -34,9 +36,13 @@ services:
     build: ./apps/api
     command: python -m app.worker
     environment:
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
-    depends_on:
-      - redis
+      MODLUDUS_EVIDENCE_DIR: /var/lib/modludus/evidence
+      MODLUDUS_EVIDENCE_SALT: ${MODLUDUS_EVIDENCE_SALT:-}
+      MODLUDUS_TRUSTED_CONFIG_JSON: ${MODLUDUS_TRUSTED_CONFIG_JSON:-}
+      MODLUDUS_JOB_LEASE_SECONDS: ${MODLUDUS_JOB_LEASE_SECONDS:-60}
+      MODLUDUS_WORKER_POLL_SECONDS: ${MODLUDUS_WORKER_POLL_SECONDS:-1}
+    volumes:
+      - evidence_data:/var/lib/modludus/evidence
 
   postgres:
     profiles: ["server"]

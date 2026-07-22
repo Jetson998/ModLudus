@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import os
 from typing import Any
 
 from fastapi import FastAPI, Header, HTTPException, Request, status
@@ -7,13 +8,17 @@ from pydantic import BaseModel, Field, HttpUrl
 
 from .trusted_season import SEASON_ID, TrustedSeasonRuntime
 
-app = FastAPI(title="ModLudus API", version="0.3.2")
+app = FastAPI(title="ModLudus API", version="0.3.3")
+web_origins = [item.strip() for item in os.environ.get(
+    "MODLUDUS_WEB_ORIGINS",
+    "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001",
+).split(",") if item.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=web_origins,
     allow_credentials=False,
     allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type", "X-ModLudus-Admin-Token"],
+    allow_headers=["Content-Type", "X-ModLudus-Admin-Token", "X-ModLudus-Reviewer-Token"],
 )
 trusted_runtime = TrustedSeasonRuntime.from_environment()
 
@@ -21,6 +26,22 @@ trusted_runtime = TrustedSeasonRuntime.from_environment()
 class EndpointProbe(BaseModel):
     api_base_url: HttpUrl
     api_key: str = Field(min_length=1)
+
+
+class ReviewDecisionInput(BaseModel):
+    case_id: str = Field(min_length=1, max_length=80)
+    decision: str = Field(pattern="^(confirmed|overturned|needs_followup)$")
+    note: str = Field(default="", max_length=500)
+
+
+class ReviewBatchInput(BaseModel):
+    reviewer_id: str = Field(min_length=1, max_length=120)
+    decisions: list[ReviewDecisionInput] = Field(min_length=1, max_length=50)
+
+
+class PublicationInput(BaseModel):
+    run_id: str = Field(min_length=1, max_length=100)
+    publisher_id: str = Field(min_length=1, max_length=120)
 
 
 @app.get("/health")
@@ -69,6 +90,15 @@ def trusted_season_run(run_id: str) -> dict[str, Any]:
     return run
 
 
+@app.get("/api/v1/trusted-seasons/runs/{run_id}/job")
+def trusted_season_job(run_id: str) -> dict[str, Any]:
+    job = trusted_runtime.store.get_job(run_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="trusted season job not found")
+    job.pop("manifest", None)
+    return job
+
+
 @app.get("/api/v1/trusted-seasons/runs/{run_id}/evidence")
 def trusted_season_evidence(run_id: str) -> dict[str, Any]:
     evidence = trusted_runtime.store.get_evidence(run_id)
@@ -89,6 +119,62 @@ def verify_trusted_season_run(run_id: str) -> dict[str, Any]:
     if not trusted_runtime.store.get_run(run_id):
         raise HTTPException(status_code=404, detail="trusted season run not found")
     return trusted_runtime.verify_run(run_id)
+
+
+@app.get("/api/v1/trusted-seasons/runs/{run_id}/reviews")
+def trusted_season_reviews(run_id: str) -> dict[str, Any]:
+    if not trusted_runtime.store.get_run(run_id):
+        raise HTTPException(status_code=404, detail="trusted season run not found")
+    reviews = trusted_runtime.store.list_reviews(run_id)
+    return {"run_id": run_id, "reviews": reviews, "latest": trusted_runtime.store.latest_reviews(run_id)}
+
+
+@app.post("/api/v1/trusted-seasons/runs/{run_id}/reviews", status_code=status.HTTP_201_CREATED)
+def create_trusted_season_reviews(
+    run_id: str,
+    payload: ReviewBatchInput,
+    reviewer_token: str = Header(default="", alias="X-ModLudus-Reviewer-Token"),
+) -> dict[str, Any]:
+    if not trusted_runtime.review_authorized(reviewer_token):
+        raise HTTPException(status_code=401, detail="reviewer authorization required")
+    try:
+        reviews = trusted_runtime.store.add_review_decisions(
+            run_id,
+            [item.model_dump() for item in payload.decisions],
+            trusted_runtime.protected_identity_hash(payload.reviewer_id),
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    return {"run_id": run_id, "reviews": reviews, "latest": trusted_runtime.store.latest_reviews(run_id)}
+
+
+@app.get("/api/v1/trusted-seasons/runs/{run_id}/publication-eligibility")
+def trusted_season_publication_eligibility(run_id: str) -> dict[str, Any]:
+    if not trusted_runtime.store.get_run(run_id):
+        raise HTTPException(status_code=404, detail="trusted season run not found")
+    return trusted_runtime.store.publication_eligibility(run_id, trusted_runtime.verify_run(run_id))
+
+
+@app.get("/api/v1/trusted-seasons/leaderboard")
+def trusted_season_leaderboard(limit: int = 20) -> dict[str, Any]:
+    return {"season_id": SEASON_ID, "publications": trusted_runtime.store.list_publications(max(1, min(50, limit)))}
+
+
+@app.post("/api/v1/trusted-seasons/leaderboard", status_code=status.HTTP_201_CREATED)
+def publish_trusted_season(
+    payload: PublicationInput,
+    admin_token: str = Header(default="", alias="X-ModLudus-Admin-Token"),
+) -> dict[str, Any]:
+    if not trusted_runtime.admin_authorized(admin_token):
+        raise HTTPException(status_code=401, detail="administrator authorization required")
+    try:
+        return trusted_runtime.store.publish_run(
+            payload.run_id,
+            trusted_runtime.protected_identity_hash(payload.publisher_id),
+            trusted_runtime.verify_run(payload.run_id),
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
 
 
 @app.post("/api/v1/endpoints/probe")

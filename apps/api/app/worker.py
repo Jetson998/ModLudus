@@ -1,12 +1,14 @@
-"""M0 worker entry point. Queue and provider adapters land in M1."""
+"""Persistent single-machine worker for trusted-season jobs."""
 
-import time
+import asyncio
+
+from .trusted_season import TrustedSeasonWorker
 
 
 def main() -> None:
-    print("ModLudus worker ready: queue adapter is planned for M1.", flush=True)
-    while True:
-        time.sleep(60)
+    worker = TrustedSeasonWorker.from_environment()
+    print(f"ModLudus trusted worker ready: {worker.worker_id}", flush=True)
+    asyncio.run(worker.run_forever())
 
 
 if __name__ == "__main__":

@@ -22,7 +22,9 @@ ModLudus 是一个基于真实业务任务的多模型竞技与智能选型平�
 - 刷新后可恢复脱敏进度；需重新导入原测试集并填写网关凭据，指纹不匹配时禁止续跑
 - 内置标准赛季 `2026.1` 八道基准题，覆盖文案、代码、总结和数据分析
 - 服务端可信赛季冻结测试集、Rubric、模型与价格配置，生成不可变证据哈希
-- 完成报告使用 Ed25519 签名，并提供公钥验签与 append-only 审计哈希链
+- 完成报告使用 Ed25519 签名，并提供公钥验签与 append-only 审计哈希链；证据、复核和发布记录与对应审计事件原子提交
+- 可信任务由独立持久 Worker 领取和续租，`attempt` fencing 阻止过期 Worker 写回，API 重启不会丢失排队任务
+- 人工复核使用独立令牌并保存追加式决定；可信榜发布冻结复核快照和排名，发布后锁定复核
 - 本地导出 JSON、CSV 和单文件 HTML 报告，不经过平台服务端
 - 单机 Docker Compose 部署，先支持本地预览和内部试点
 
@@ -57,6 +59,8 @@ M3.1 批量实验室复用快速竞技区的网关和裁判配置。测试集文
 
 M3.2 可信赛季控制台调用 ModLudus API，由服务器使用部署时配置的模型凭据执行固定赛季。运行证据保存在挂载的 `evidence_data` 卷；模型输出与 Prompt 原文不进入签名报告，只记录哈希、评分、Token、延迟、成本和失败类型。
 
+M3.3 中 API 只负责冻结运行并写入持久任务，`apps/api/app/worker.py` 从同一证据卷领取任务。Worker 使用租约和心跳恢复中断任务，并以 `attempt` 作为 fencing token；证据、Run 和 Job 完成状态事务化封存，重复封存幂等返回。这是单机 Docker Compose 的 SQLite/WAL 持久队列，不宣称为分布式 Redis/PostgreSQL 队列。
+
 服务器配置示例（实际 Key 只放服务器环境或 Secret 管理器，不提交仓库）：
 
 ```json
@@ -76,6 +80,10 @@ M3.2 可信赛季控制台调用 ModLudus API，由服务器使用部署时配�
 同时用 `MODLUDUS_TRUSTED_ENVIRONMENT` 标记 `local-e2e`、`staging` 或 `official`，并用 `MODLUDUS_TRUSTED_SIMULATED` 冻结是否为模拟运行。两者都会进入签名 Manifest 和运行记录，历史报告不会随服务器当前环境变化而改名。
 
 启动可信赛季属于付费写操作，默认必须设置 `MODLUDUS_ADMIN_TOKEN`，管理员在页面内存中临时输入令牌。只有本机验收可同时设置 `MODLUDUS_TRUSTED_ENVIRONMENT=local-e2e` 与 `MODLUDUS_LOCAL_E2E_BYPASS=true`；绕过仅接受来自回环地址的请求。不得在 staging/official 或公网代理环境开启该开关。
+
+人工复核写操作使用 `MODLUDUS_REVIEWER_TOKEN`。若未单独设置，管理员令牌可兼任复核令牌。赛季榜发布始终要求管理员令牌，并拒绝 local-e2e、staging、simulated、验签失败或强制复核未完成的运行。当前 `overturned` 只标记异议并保持未闭环；发布会冻结 `review_snapshot_hash` 和实际排名，此后禁止追加复核。
+
+Web 与 API 分离部署时，用逗号分隔的 `MODLUDUS_WEB_ORIGINS` 明确列出允许访问 API 的页面来源。CORS 只控制浏览器互操作，不能替代管理员或复核令牌鉴权。
 
 ```bash
 docker compose --profile server up --build
