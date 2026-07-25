@@ -9,4 +9,6 @@ __pycache__/
 !.env.example
 data/
 volumes/
+backups/
+restore/
 *.log

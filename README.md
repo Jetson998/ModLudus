@@ -25,6 +25,8 @@ ModLudus 是一个基于真实业务任务的多模型竞技与智能选型平�
 - 完成报告使用 Ed25519 签名，并提供公钥验签与 append-only 审计哈希链；证据、复核和发布记录与对应审计事件原子提交
 - 可信任务由独立持久 Worker 领取和续租，`attempt` fencing 阻止过期 Worker 写回，API 重启不会丢失排队任务
 - 人工复核使用独立令牌并保存追加式决定；可信榜发布冻结复核快照和排名，发布后锁定复核
+- 模型天梯由服务端维护 OpenRouter 模型目录与 Artificial Analysis 指标共享快照，客户可手动触发更新，每个来源全站 24 小时最多成功更新一次
+- 可信证据支持在线 SQLite 快照、离线完整性验证和空目录恢复；备份包含签名私钥并按敏感资产处理
 - 本地导出 JSON、CSV 和单文件 HTML 报告，不经过平台服务端
 - 单机 Docker Compose 部署，先支持本地预览和内部试点
 
@@ -61,6 +63,12 @@ M3.2 可信赛季控制台调用 ModLudus API，由服务器使用部署时配�
 
 M3.3 中 API 只负责冻结运行并写入持久任务，`apps/api/app/worker.py` 从同一证据卷领取任务。Worker 使用租约和心跳恢复中断任务，并以 `attempt` 作为 fencing token；证据、Run 和 Job 完成状态事务化封存，重复封存幂等返回。这是单机 Docker Compose 的 SQLite/WAL 持久队列，不宣称为分布式 Redis/PostgreSQL 队列。
 
+M4.1 增加本地运维 CLI `apps/api/app/backup.py`。创建备份时使用 SQLite Online Backup API 获取一致快照，并把证据库和 Ed25519 私钥放入权限为 `0600` 的 ZIP；验证会检查文件哈希、SQLite 完整性、审计链、全部证据签名和签名密钥指纹。恢复只允许写入不存在或为空的目录，不直接覆盖活动证据卷。
+
+模型天梯不再从浏览器为每个用户重复请求外部站点。`GET /api/v1/ladder` 读取服务器共享快照，`POST /api/v1/ladder/refresh/openrouter` 与 `POST /api/v1/ladder/refresh/artificial-analysis` 允许客户手动触发固定来源更新。成功更新后服务器设置 24 小时共享冷却时间；并发点击使用 SQLite 租约和 attempt fencing，只允许一个请求执行，其他用户直接读取现有快照并看到下次可更新时间。OpenRouter 是模型实体、上下文、上架时间和参考价格的主目录；Artificial Analysis 只叠加可可靠映射的 Intelligence、Cost per Task、速度、TTFT 和总响应时间，不覆盖 ModLudus 实测。
+
+Artificial Analysis 当前通过公开榜单页面生成带来源 URL、抓取时间、内容哈希和 `public-page-reference` 状态的快照。此实现不是演示数据；正式对外再发布其数据前，部署方仍应确认适用的商业转载或 API 许可。上游结构变化或请求失败时保留上一份有效快照，并在 15 分钟后允许重试。
+
 服务器配置示例（实际 Key 只放服务器环境或 Secret 管理器，不提交仓库）：
 
 ```json
@@ -89,6 +97,22 @@ Web 与 API 分离部署时，用逗号分隔的 `MODLUDUS_WEB_ORIGINS` 明确�
 docker compose --profile server up --build
 ```
 
+可信证据备份与恢复演练：
+
+```bash
+mkdir -p backups restore
+docker compose --profile ops run --rm backup create \
+  --data-dir /var/lib/modludus/evidence \
+  --output /var/lib/modludus/backups/modludus-trusted-backup.zip
+docker compose --profile ops run --rm backup verify \
+  --input /var/lib/modludus/backups/modludus-trusted-backup.zip
+docker compose --profile ops run --rm backup restore \
+  --input /var/lib/modludus/backups/modludus-trusted-backup.zip \
+  --target-dir /var/lib/modludus/restore/evidence
+```
+
+备份归档包含 Ed25519 私钥，不能上传到公开对象存储或提交 Git。生产环境应在归档外层使用组织认可的加密与密钥管理方案。恢复命令只产出经过复验的新目录；正式切换证据卷前必须停止 API 与 Worker、保留旧卷并再次运行 `verify`，当前版本不自动替换活动卷。
+
 开发服务使用 `.next`，生产构建使用 `.next-build`，两者可以并行运行。完整本地校验：
 
 ```bash
@@ -103,10 +127,13 @@ PYTHONPATH=apps/api python3 -m unittest discover -s apps/api/tests -v
 ```text
 apps/web     Next.js 产品界面
 apps/api     FastAPI 控制面、可信赛季执行、签名证据与审计 API
-apps/api/app/worker.py  异步任务 Worker 占位
+apps/api/app/worker.py  持久可信赛季 Worker
+apps/api/app/backup.py  可信证据备份、验证与恢复 CLI
 docs/        产品、架构与执行记录
 ```
 
 ## 设计边界
 
 EvalScope、LiteLLM、Promptfoo 和 Langfuse 通过 adapter 接入；Run、匿名盲测、裁判、人审、推荐和审计属于 ModLudus 自有领域，不把第三方项目作为业务真相源。
+
+厂商 SVG 图标来自 [LobeHub Icons](https://github.com/lobehub/lobe-icons) MIT 开源项目；品牌名称与商标归各自权利人所有。

@@ -791,10 +791,13 @@ def parse_judge(content: str, aliases: list[str]) -> Optional[dict[str, Any]]:
         return None
 
 
-def provider_call(provider: Provider, model: str, content: str, temperature: float, timeout: int) -> dict[str, Any]:
+def provider_call(provider: Provider, model: str, content: str, _temperature: float, timeout: int) -> dict[str, Any]:
+    # Keep the positional argument for worker/test compatibility, but do not
+    # send temperature. New reasoning models (including Claude Opus 5) reject
+    # the deprecated parameter with HTTP 400.
     request = Request(
         f"{provider.base_url}/v1/chat/completions",
-        data=canonical_json({"model": model, "messages": [{"role": "user", "content": content}], "temperature": temperature}).encode("utf-8"),
+        data=canonical_json({"model": model, "messages": [{"role": "user", "content": content}]}).encode("utf-8"),
         headers={"Content-Type": "application/json", "Authorization": f"Bearer {provider.api_key}"},
         method="POST",
     )

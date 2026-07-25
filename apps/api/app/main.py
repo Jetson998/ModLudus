@@ -1,17 +1,18 @@
 from datetime import datetime, timezone
 import os
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import FastAPI, Header, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, HttpUrl
 
 from .trusted_season import SEASON_ID, TrustedSeasonRuntime
+from .ladder import LadderService
 
-app = FastAPI(title="ModLudus API", version="0.3.3")
+app = FastAPI(title="ModLudus API", version="0.4.2")
 web_origins = [item.strip() for item in os.environ.get(
     "MODLUDUS_WEB_ORIGINS",
-    "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001",
+    "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001,http://localhost:3002,http://127.0.0.1:3002",
 ).split(",") if item.strip()]
 app.add_middleware(
     CORSMiddleware,
@@ -21,6 +22,7 @@ app.add_middleware(
     allow_headers=["Content-Type", "X-ModLudus-Admin-Token", "X-ModLudus-Reviewer-Token"],
 )
 trusted_runtime = TrustedSeasonRuntime.from_environment()
+ladder_service = LadderService.from_environment()
 
 
 class EndpointProbe(BaseModel):
@@ -44,6 +46,10 @@ class PublicationInput(BaseModel):
     publisher_id: str = Field(min_length=1, max_length=120)
 
 
+class CommunityEvaluationInput(BaseModel):
+    event_id: str = Field(min_length=36, max_length=36)
+
+
 @app.get("/health")
 def health() -> dict[str, Any]:
     return {"status": "ok", "service": "modludus-api", "time": datetime.now(timezone.utc).isoformat()}
@@ -56,6 +62,25 @@ def product() -> dict[str, Any]:
         "positioning": "基于真实业务任务的多模型竞技与智能选型平台",
         "mvp": {"mode": "single-turn-text", "deployment": "single-machine-docker-compose"},
     }
+
+
+@app.get("/api/v1/ladder")
+def model_ladder() -> dict[str, Any]:
+    return ladder_service.get_ladder()
+
+
+@app.post("/api/v1/ladder/refresh/{source}")
+def refresh_model_ladder(source: Literal["openrouter", "artificial-analysis"]) -> dict[str, Any]:
+    result = ladder_service.refresh(source)
+    return {"refresh": result, "ladder": ladder_service.get_ladder()}
+
+
+@app.post("/api/v1/ladder/community-evaluations")
+def record_community_evaluation(payload: CommunityEvaluationInput) -> dict[str, Any]:
+    try:
+        return ladder_service.record_community_evaluation(payload.event_id)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
 
 
 @app.get("/api/v1/trusted-seasons/status")

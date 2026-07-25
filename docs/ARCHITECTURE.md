@@ -10,6 +10,10 @@ MVP 默认采用 Web Privacy Mode：浏览器直接调用用户配置的 OpenAI-
 
 M3.2 新增 Trusted Season 服务端链路。它与 Web Privacy Mode 严格分离：浏览器中的用户 Base URL/Key 永不进入可信赛季 API；可信赛季只使用服务器部署环境中的管理员凭据。M3.3 将执行从 API 进程迁移到独立 Worker：API 只冻结 Manifest 并写入共享证据卷上的持久任务，Worker 使用租约、心跳和最大重试次数领取任务。`attempt` 同时作为 fencing token，所有运行进度、失败和封存写入都校验当前租约；证据、Run 与 Job 完成状态在同一事务中封存，重复封存幂等返回已有证据。API 重启不影响队列；Worker 异常后租约过期可由新 Worker 续跑。该实现是单机 SQLite/WAL 队列，不等同于 Redis/PostgreSQL 分布式任务系统。
 
+M4.1 为共享证据卷增加离线恢复边界，但不开放公网备份 API。运维 CLI 使用 SQLite Online Backup API 创建一致快照，将数据库与 Ed25519 私钥封装为权限 `0600` 的敏感归档。归档 Manifest 冻结文件哈希、密钥指纹、表计数和创建时验证结果；独立验证重新执行 SQLite integrity check、全局审计链和全部证据签名校验。恢复只写入空目录，活动卷切换仍需停机、保留旧卷并由运维人员显式完成。
+
+模型天梯外部数据由 API 侧 `ladder-cache.sqlite3` 统一维护，不由每个浏览器直接抓取。OpenRouter 快照作为模型主目录；Artificial Analysis 公共榜单快照作为外部质量与性能指标层。两个固定来源分别使用 24 小时成功更新间隔、5 分钟刷新租约、attempt fencing 和 15 分钟失败重试窗口。模型映射同时保留 OpenRouter Model ID、AA 原始行名、来源 URL、抓取时间和许可状态；含括号的推理/速度档位只有精确匹配或存在来源基准时才允许合并，避免把 `Fast` 错映射到 `max`。
+
 ## 领域对象
 
 `Workspace`、`Project`、`ProviderEndpoint`、`ModelSnapshot`、`TestCase`、`Run`、`CandidateAttempt`、`BlindAssignment`、`JudgeTask`、`JudgeVerdict`、`HumanReview`、`MetricSample`、`Recommendation`、`AuditEvent`。
@@ -29,6 +33,8 @@ M3.1 浏览器批量模式使用 `AbortController` 取消在途 fetch，使用�
 人工复核写接口要求 `X-ModLudus-Reviewer-Token`，也可由部署时显式配置的管理员令牌接管。复核只保存决定、复核人加盐哈希和备注哈希，记录为 append-only。当前版本不具备修正分数结构，因此 `overturned` 保持未闭环，只有 `confirmed` 能解除必要复核门禁。赛季榜发布必须使用管理员令牌，并同时满足 official、非模拟、完整验签、审计链有效和强制复核闭环。发布事务冻结 `review_snapshot_hash` 和实际排名，发布后禁止继续追加复核；发布记录本身不可更新或删除。证据封存、复核决定和榜单发布均在各自业务事务内同步追加审计事件，任一写入失败会整体回滚，避免业务状态与审计链分叉。
 
 完成报告按 canonical JSON 计算 SHA-256 证据哈希，再用服务端 Ed25519 私钥签名。私钥仅保存在证据卷且权限为 `0600`，API 暴露公钥、指纹和验签结果。`immutable_evidence` 与 `audit_events` 表由 SQLite trigger 禁止更新和删除；审计事件通过 `previous_hash` 形成 append-only 哈希链。
+
+备份归档因包含 Ed25519 私钥而属于高敏恢复资产。ModLudus 只保证本地归档文件权限、内容完整性和安全恢复边界；外层加密、远端保管、密钥托管、保留周期和异地容灾由部署组织负责。
 
 ## 开源边界
 

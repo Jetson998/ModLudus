@@ -4,6 +4,7 @@ import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { dedupeCandidates, estimateCostUsd, fisherYatesShuffle, parseJudgeVerdict, StructuredJudgeVerdict, uniqueModels } from './arena-utils';
 import { BatchTestCase, buildCsvReport, buildHtmlReport, createRubricSnapshot, parseDataset, RubricDimension, RubricSnapshot, selectReviewCaseIds, shouldSampleForReview, standardSeasonCases } from './m2-utils';
 import { batchCheckpointKey, BatchCheckpoint, caseFingerprint, clampConcurrency, configurationFingerprint, connectionModelIdentity, createConfigurationSalt, datasetFingerprint, parseBatchCheckpoint, PersistedBatchResult, restoreJudgeVerdict, runWithConcurrency, sanitizeJudgeVerdict, storeBatchCheckpoint } from './m3-utils';
+import { recordCommunityEvaluation } from './community-metrics';
 
 type BatchConnection = {
   id: number;
@@ -305,6 +306,7 @@ export default function BatchLab({ connections, judgeConnectionId, judgeModel, r
           ? `已取消：本次完成 ${completedThisRun}/${casesToRun.length} 道题。脱敏进度已保存，可刷新后恢复。`
           : `已取消：本次完成 ${completedThisRun}/${casesToRun.length} 道题，但浏览器拒绝写入恢复点；当前进度不可刷新恢复。`);
       } else {
+        if (mode === 'full' && finalResults.length === testCases.length) void recordCommunityEvaluation();
         const stored = writeCheckpoint(finalResults.length === testCases.length ? 'completed' : 'cancelled', activeSnapshot, configurationSalt, configurationValue, finalResults);
         const label = mode === 'retry' ? '失败题目重试完成' : mode === 'resume' ? '未完成题目续跑完成' : '批量评测完成';
         setStatus(stored
@@ -372,9 +374,9 @@ export default function BatchLab({ connections, judgeConnectionId, judgeModel, r
   }
 
   return <section id="batch" className="batch-section">
-    <div className="batch-heading"><div><span className="section-kicker">M3.1 / RESILIENT BATCH LAB</span><h2>可恢复的批量评测</h2><p>可取消在途请求、配置题目并发，并在刷新后恢复脱敏进度。题目、Key、Base URL 和模型答案不写入恢复点。</p></div><span className="draft-pill">M3.1 · 标签页恢复</span></div>
+    <div className="batch-heading"><div><span className="section-kicker">批量测试集</span><h2>可恢复的批量评测</h2><p>可取消在途请求、配置题目并发，并在刷新后恢复脱敏进度。题目、Key、Base URL 和模型答案不写入恢复点。</p></div><span className="draft-pill">支持刷新恢复</span></div>
 
-    {checkpoint && <article className="checkpoint-panel"><div><span className="section-kicker">SESSION CHECKPOINT</span><strong>检测到可恢复进度：{checkpoint.results.length}/{checkpoint.totalCases}</strong><small>{checkpoint.status === 'completed' ? '已完成' : checkpoint.status === 'cancelled' ? '已取消 / 未完成' : '上次运行中断'} · {checkpoint.savedAt.replace('T', ' ').slice(0, 19)} · 仅脱敏指标</small></div><div className="checkpoint-actions"><button className="outline-button" disabled={running || !testCases.length} onClick={restoreCheckpoint}>匹配当前测试集并恢复</button><button className="text-button" disabled={running} onClick={clearCheckpoint}>清除恢复点</button></div></article>}
+    {checkpoint && <article className="checkpoint-panel"><div><span className="section-kicker">脱敏恢复点</span><strong>检测到可恢复进度：{checkpoint.results.length}/{checkpoint.totalCases}</strong><small>{checkpoint.status === 'completed' ? '已完成' : checkpoint.status === 'cancelled' ? '已取消 / 未完成' : '上次运行中断'} · {checkpoint.savedAt.replace('T', ' ').slice(0, 19)} · 仅脱敏指标</small></div><div className="checkpoint-actions"><button className="outline-button" disabled={running || !testCases.length} onClick={restoreCheckpoint}>匹配当前测试集并恢复</button><button className="text-button" disabled={running} onClick={clearCheckpoint}>清除恢复点</button></div></article>}
 
     <div className="batch-grid">
       <article className="batch-panel"><div className="panel-title"><div><strong>① 测试集</strong><small>CSV 列：id, category, prompt, expected, tags</small></div><label className="file-button">导入本地文件<input type="file" accept=".csv,.jsonl,application/json,text/csv" onChange={handleFile} /></label></div><textarea value={datasetText} onChange={(event) => setDatasetText(event.target.value)} aria-label="批量测试集内容" /><div className="panel-actions"><button className="outline-button" onClick={() => loadDataset()}>校验并载入</button><button className="outline-button" onClick={() => { const content = standardSeasonCases.map((item) => JSON.stringify(item)).join('\n'); setDatasetText(content); setDatasetFilename('standard-season-2026.1.jsonl'); loadDataset(content, 'standard-season-2026.1.jsonl'); }}>加载标准赛季 2026.1</button></div><p className="panel-message">{datasetMessage}</p>{testCases.length > 0 && <div className="case-preview">{testCases.slice(0, 8).map((item) => <span key={item.id}>{item.id} · {item.category}</span>)}{testCases.length > 8 && <span>另有 {testCases.length - 8} 道题</span>}</div>}</article>

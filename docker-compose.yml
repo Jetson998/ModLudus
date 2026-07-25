@@ -16,7 +16,7 @@ services:
     environment:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       POSTGRES_DSN: postgresql://${POSTGRES_USER:-modludus}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-modludus}
-      MODLUDUS_WEB_ORIGINS: ${MODLUDUS_WEB_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      MODLUDUS_WEB_ORIGINS: ${MODLUDUS_WEB_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001,http://localhost:3002,http://127.0.0.1:3002}
       MODLUDUS_EVIDENCE_DIR: /var/lib/modludus/evidence
       MODLUDUS_EVIDENCE_SALT: ${MODLUDUS_EVIDENCE_SALT:-}
       MODLUDUS_TRUSTED_ENVIRONMENT: ${MODLUDUS_TRUSTED_ENVIRONMENT:-local}
@@ -25,6 +25,7 @@ services:
       MODLUDUS_REVIEWER_TOKEN: ${MODLUDUS_REVIEWER_TOKEN:-}
       MODLUDUS_LOCAL_E2E_BYPASS: ${MODLUDUS_LOCAL_E2E_BYPASS:-false}
       MODLUDUS_TRUSTED_CONFIG_JSON: ${MODLUDUS_TRUSTED_CONFIG_JSON:-}
+      MODLUDUS_LADDER_CACHE_DIR: /var/lib/modludus/evidence
     volumes:
       - evidence_data:/var/lib/modludus/evidence
     depends_on:
@@ -43,6 +44,15 @@ services:
       MODLUDUS_WORKER_POLL_SECONDS: ${MODLUDUS_WORKER_POLL_SECONDS:-1}
     volumes:
       - evidence_data:/var/lib/modludus/evidence
+
+  backup:
+    profiles: ["ops"]
+    build: ./apps/api
+    entrypoint: ["python", "-m", "app.backup"]
+    volumes:
+      - evidence_data:/var/lib/modludus/evidence
+      - ${MODLUDUS_BACKUP_DIR:-./backups}:/var/lib/modludus/backups
+      - ${MODLUDUS_RESTORE_DIR:-./restore}:/var/lib/modludus/restore
 
   postgres:
     profiles: ["server"]

@@ -5,6 +5,7 @@ import sqlite3
 import tempfile
 import threading
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from app.trusted_season import (
@@ -17,6 +18,7 @@ from app.trusted_season import (
     build_manifest,
     canonical_json,
     execute_trusted_run,
+    provider_call,
     sha256_text,
 )
 
@@ -33,6 +35,33 @@ CONFIG_JSON = json.dumps({
 
 
 class TrustedSeasonTests(unittest.TestCase):
+    def test_provider_call_omits_deprecated_temperature(self):
+        config = TrustedConfig.from_json(CONFIG_JSON)
+        self.assertIsNotNone(config)
+        captured = {}
+
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def read(self):
+                return b'{"choices":[{"message":{"content":"ok"}}],"usage":{}}'
+
+        def fake_urlopen(request, timeout):
+            captured["body"] = json.loads(request.data)
+            captured["timeout"] = timeout
+            return FakeResponse()
+
+        with patch("app.trusted_season.urlopen", side_effect=fake_urlopen):
+            result = provider_call(config.providers["official"], "claude-opus-5", "hello", 0.7, 120)
+
+        self.assertEqual(result["content"], "ok")
+        self.assertNotIn("temperature", captured["body"])
+        self.assertEqual(captured["timeout"], 120)
+
     def test_manifest_freezes_public_configuration_without_endpoint_or_key(self):
         config = TrustedConfig.from_json(CONFIG_JSON)
         self.assertIsNotNone(config)
