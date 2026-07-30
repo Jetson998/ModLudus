@@ -61,7 +61,7 @@ type ReviewDecision = { id: string; case_id: string; decision: 'confirmed' | 'ov
 type PublicationEligibility = { eligible: boolean; reasons: string[] };
 type Publication = { id: string; run_id: string; evidence_hash: string; review_snapshot_hash: string; publication_hash: string; published_at: string; ranking: Evidence['report']['ranking'] };
 
-const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000').replace(/\/$/, '');
 
 function shortHash(value?: string | null) {
   return value ? `${value.slice(0, 12)}…${value.slice(-8)}` : '—';

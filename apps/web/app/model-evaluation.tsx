@@ -36,7 +36,7 @@ type PriceSnapshot = {
 
 type RunPhase = 'idle' | 'generating' | 'judging';
 const MODEL_REQUEST_TIMEOUT_MS = 120_000;
-const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000').replace(/\/$/, '');
 
 const scenarioExamples: Record<string, { hint: string; prompt: string }> = {
   文案生成: {

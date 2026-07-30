@@ -1,0 +1,80 @@
+# release-governance:scoped-deployment
+name: modludus
+
+services:
+  web:
+    image: ${MODLUDUS_WEB_IMAGE:?set MODLUDUS_WEB_IMAGE}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${MODLUDUS_WEB_PORT:-3100}:3000"
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  api:
+    image: ${MODLUDUS_API_IMAGE:?set MODLUDUS_API_IMAGE}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${MODLUDUS_API_PORT:-8100}:8000"
+    environment:
+      MODLUDUS_WEB_ORIGINS: ${MODLUDUS_WEB_ORIGINS:?set MODLUDUS_WEB_ORIGINS}
+      MODLUDUS_EVIDENCE_DIR: /var/lib/modludus/evidence
+      MODLUDUS_LADDER_CACHE_DIR: /var/lib/modludus/evidence
+      MODLUDUS_EVIDENCE_SALT: ${MODLUDUS_EVIDENCE_SALT:?set MODLUDUS_EVIDENCE_SALT}
+      MODLUDUS_TRUSTED_ENVIRONMENT: ${MODLUDUS_TRUSTED_ENVIRONMENT:-staging}
+      MODLUDUS_TRUSTED_SIMULATED: ${MODLUDUS_TRUSTED_SIMULATED:-false}
+      MODLUDUS_ADMIN_TOKEN: ${MODLUDUS_ADMIN_TOKEN:?set MODLUDUS_ADMIN_TOKEN}
+      MODLUDUS_REVIEWER_TOKEN: ${MODLUDUS_REVIEWER_TOKEN:?set MODLUDUS_REVIEWER_TOKEN}
+      MODLUDUS_LOCAL_E2E_BYPASS: "false"
+      MODLUDUS_ENABLE_ANONYMOUS_CONTRIBUTIONS: "false"
+      MODLUDUS_TRUSTED_CONFIG_JSON: ${MODLUDUS_TRUSTED_CONFIG_JSON:-}
+    volumes:
+      - evidence_data:/var/lib/modludus/evidence
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4).read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  worker:
+    image: ${MODLUDUS_API_IMAGE:?set MODLUDUS_API_IMAGE}
+    command: python -m app.worker
+    restart: unless-stopped
+    environment:
+      MODLUDUS_EVIDENCE_DIR: /var/lib/modludus/evidence
+      MODLUDUS_EVIDENCE_SALT: ${MODLUDUS_EVIDENCE_SALT:?set MODLUDUS_EVIDENCE_SALT}
+      MODLUDUS_TRUSTED_CONFIG_JSON: ${MODLUDUS_TRUSTED_CONFIG_JSON:-}
+      MODLUDUS_JOB_LEASE_SECONDS: ${MODLUDUS_JOB_LEASE_SECONDS:-60}
+      MODLUDUS_WORKER_POLL_SECONDS: ${MODLUDUS_WORKER_POLL_SECONDS:-1}
+    volumes:
+      - evidence_data:/var/lib/modludus/evidence
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      api:
+        condition: service_healthy
+
+  backup:
+    profiles: ["ops"]
+    image: ${MODLUDUS_API_IMAGE:?set MODLUDUS_API_IMAGE}
+    entrypoint: ["python", "-m", "app.backup"]
+    environment:
+      MODLUDUS_EVIDENCE_DIR: /var/lib/modludus/evidence
+    volumes:
+      - evidence_data:/var/lib/modludus/evidence
+      - ${MODLUDUS_BACKUP_DIR:-/opt/modludus/backups}:/var/lib/modludus/backups
+      - ${MODLUDUS_RESTORE_DIR:-/opt/modludus/restore}:/var/lib/modludus/restore
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  evidence_data:
+    name: modludus_evidence_data

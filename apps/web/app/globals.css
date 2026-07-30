@@ -358,9 +358,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .ladder-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 16px; }
 .ladder-toolbar > span { color: var(--muted); font-size: 12px; }
 .ladder-controls { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.quality-modes { display: inline-flex; gap: 6px; margin: -4px 0 16px; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: #faf7ff; }
-.quality-modes button { min-height: 34px; padding: 0 12px; border: 0; border-radius: 7px; color: var(--muted); background: transparent; cursor: pointer; }
-.quality-modes button.active { color: var(--accent); background: #fff; box-shadow: 0 3px 10px rgba(62,28,96,.09); }
 .country-filters { display: flex; gap: 8px; margin-bottom: 14px; padding-bottom: 2px; overflow-x: auto; scrollbar-width: thin; }
 .country-filters button { flex: 0 0 auto; min-height: 36px; padding: 0 13px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: #fff; cursor: pointer; white-space: nowrap; }
 .country-filters button:hover { color: var(--accent); border-color: var(--accent-border); }
@@ -411,8 +408,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   .source-body { padding: 0 14px 14px 33px; }
   .ladder-model-card dl { grid-template-columns: 1fr 1fr; }
   .ladder-controls { align-items: stretch; flex-direction: column; }
-  .quality-modes { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); width: 100%; }
-  .quality-modes button { min-width: 0; padding: 0 5px; font-size: 11px; }
   .ladder-search { width: 100%; }
   .ladder-presets { grid-template-columns: repeat(5,minmax(0,1fr)); }
   .ladder-presets button { padding: 0 5px; font-size: 11px; }

@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { buildRankingScores, eligibleForView } from './ranking';
-import type { QualityMode } from './ranking';
 
 type View = 'quality' | 'cost' | 'value' | 'speed' | 'latest';
 type Country = 'china' | 'usa' | 'france' | 'canada' | 'uk' | 'israel' | 'other' | 'all';
@@ -59,11 +58,10 @@ type RefreshResult = {
   item_count?: number;
 };
 
-const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000').replace(/\/$/, '');
 const PAGE_SIZE = 20;
 const views: Array<[View, string]> = [['quality', '质量优先'], ['cost', '低价'], ['value', '性价比'], ['speed', '快速'], ['latest', '新上架']];
 const countries: Array<[Country, string]> = [['china', '🇨🇳 中国'], ['usa', '🇺🇸 美国'], ['france', '🇫🇷 法国'], ['canada', '🇨🇦 加拿大'], ['uk', '🇬🇧 英国'], ['israel', '🇮🇱 以色列'], ['other', '🌍 其他'], ['all', '全部']];
-const qualityModes: Array<[QualityMode, string]> = [['intelligence', '综合质量'], ['quality-speed', '质量＋速度'], ['quality-latency', '质量＋低延迟']];
 
 function formatTime(value?: string | null) {
   if (!value) return '尚未更新';
@@ -133,7 +131,6 @@ function SourceCard({ source, tone, title, meta, defaultOpen = false, children }
 export default function LadderPage() {
   const [view, setView] = useState<View>('quality');
   const [country, setCountry] = useState<Country>('all');
-  const [qualityMode, setQualityMode] = useState<QualityMode>('intelligence');
   const [payload, setPayload] = useState<LadderPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -160,7 +157,7 @@ export default function LadderPage() {
   useEffect(() => {
     setPage(1);
     setExpandedModels([]);
-  }, [country, qualityMode, search, view]);
+  }, [country, search, view]);
 
   async function refreshSource(source: SourceName) {
     setUpdating(source);
@@ -193,17 +190,15 @@ export default function LadderPage() {
     const query = search.trim().toLowerCase();
     const allModels = payload?.models ?? [];
     const scores = buildRankingScores(allModels);
-    const models = allModels.filter((item) => (country === 'all' || providerCountry(item) === country) && eligibleForView(item, view, qualityMode) && (!query || `${item.model} ${item.provider} ${item.id}`.toLowerCase().includes(query)));
+    const models = allModels.filter((item) => (country === 'all' || providerCountry(item) === country) && eligibleForView(item, view, 'intelligence') && (!query || `${item.model} ${item.provider} ${item.id}`.toLowerCase().includes(query)));
     return models.sort((a, b) => {
       if (view === 'latest') return b.created - a.created;
-      if (view === 'quality' && qualityMode === 'quality-speed') return compareNullable(scores.qualitySpeed.get(a.id), scores.qualitySpeed.get(b.id));
-      if (view === 'quality' && qualityMode === 'quality-latency') return compareNullable(scores.qualityLatency.get(a.id), scores.qualityLatency.get(b.id));
       if (view === 'quality') return compareNullable(a.quality, b.quality);
       if (view === 'cost') return compareNullable(a.combined_price_per_million, b.combined_price_per_million, 'asc');
       if (view === 'speed') return compareNullable(a.speed_tokens_per_second, b.speed_tokens_per_second);
       return compareNullable(scores.value.get(a.id), scores.value.get(b.id));
     });
-  }, [country, payload, qualityMode, search, view]);
+  }, [country, payload, search, view]);
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -244,16 +239,15 @@ export default function LadderPage() {
 
     <section id="ladder-results" className="ladder-workbench">
       <div className="country-filters" role="group" aria-label="按模型厂商所属国家筛选">{countries.map(([value, label]) => <button key={value} aria-pressed={country === value} className={country === value ? 'active' : ''} onClick={() => setCountry(value)}>{label}</button>)}</div>
-      <div className="ladder-toolbar"><div className="ladder-controls"><div className="ladder-presets" role="group" aria-label="天梯排序方式">{views.map(([value, label]) => <button key={value} aria-pressed={view === value} className={view === value ? 'active' : ''} onClick={() => setView(value)}>{label}</button>)}</div><input aria-label="搜索模型" className="ladder-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索模型、厂商或 Model ID" /></div><span>{sorted.length ? `显示 ${pageStart + 1}–${pageStart + displayed.length}/${sorted.length}` : '显示 0/0'} · 当前排序：{view === 'quality' ? qualityModes.find(([value]) => value === qualityMode)?.[1] : views.find(([value]) => value === view)?.[1]}</span></div>
-      {view === 'quality' && <div className="quality-modes" role="group" aria-label="质量优先细分">{qualityModes.map(([value, label]) => <button key={value} aria-pressed={qualityMode === value} className={qualityMode === value ? 'active' : ''} onClick={() => setQualityMode(value)}>{label}</button>)}</div>}
+      <div className="ladder-toolbar"><div className="ladder-controls"><div className="ladder-presets" role="group" aria-label="天梯排序方式">{views.map(([value, label]) => <button key={value} aria-pressed={view === value} className={view === value ? 'active' : ''} onClick={() => setView(value)}>{label}</button>)}</div><input aria-label="搜索模型" className="ladder-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索模型、厂商或 Model ID" /></div><span>{sorted.length ? `显示 ${pageStart + 1}–${pageStart + displayed.length}/${sorted.length}` : '显示 0/0'} · 当前排序：{views.find(([value]) => value === view)?.[1]}</span></div>
       {loading ? <div className="ladder-skeleton" aria-label="正在加载模型榜单">{Array.from({ length: 6 }, (_, index) => <div key={index}><span /><span /><span /><span /></div>)}</div> : displayed.length ? <>
         <div className="ladder-list-head" aria-hidden="true"><span>模型</span><span>AA Intelligence</span><span>OpenRouter 价格</span><span>输出速度</span><span>首字延迟</span></div>
         <div className="ladder-list">{displayed.map((item, index) => {
           const isExpanded = expandedModels.includes(item.id);
           const qualityPrimary = true;
-          const pricePrimary = view === 'cost' || view === 'value' || view === 'latest' || (view === 'quality' && qualityMode === 'intelligence');
-          const speedPrimary = view === 'quality' && qualityMode === 'quality-speed';
-          const latencyPrimary = view === 'quality' && qualityMode === 'quality-latency';
+          const pricePrimary = view === 'cost' || view === 'value' || view === 'latest';
+          const speedPrimary = view === 'speed';
+          const latencyPrimary = false;
           return <article key={item.id} className={`ladder-model-card${isExpanded ? ' details-open' : ''}`}><div className="ladder-model-name"><span className="rank">{String(pageStart + index + 1).padStart(2, '0')}</span><ProviderLogo provider={item.provider} /><div><strong>{item.model}</strong><small>{item.provider} · {formatContext(item)} · {item.id}</small></div></div><dl><div className={`${view === 'quality' || view === 'value' ? 'active ' : ''}${qualityPrimary ? 'metric-primary' : ''}`}><dt>AA Intelligence</dt><dd>{valueOrDash(item.quality, 1)}</dd><small>{item.aa_model ? `${item.aa_model}${Number.isFinite(item.aa_cost_per_task_usd) ? ` · $${Number(item.aa_cost_per_task_usd).toFixed(2)}/任务` : ''}` : item.quality_source === 'openrouter-aa-benchmark' ? 'OpenRouter 目录内含 AA Intelligence' : '暂无 AA 匹配指标'}</small></div><div className={`${view === 'cost' || view === 'value' ? 'active ' : ''}${pricePrimary ? 'metric-primary' : ''}`}><dt>OpenRouter 价格</dt><dd>{Number.isFinite(item.combined_price_per_million) ? `$${Number(item.combined_price_per_million).toFixed(2)}` : '—'}</dd><small>输入＋输出 / 百万 tokens</small></div><div className={speedPrimary ? 'metric-primary' : ''}><dt>输出速度</dt><dd>{Number.isFinite(item.speed_tokens_per_second) ? `${valueOrDash(item.speed_tokens_per_second)} t/s` : '—'}</dd><small>Artificial Analysis 快照</small></div><div className={latencyPrimary ? 'metric-primary' : ''}><dt>首字延迟</dt><dd>{Number.isFinite(item.latency_first_chunk_seconds) ? `${valueOrDash(item.latency_first_chunk_seconds, 2)}s` : '—'}</dd><small>{Number.isFinite(item.total_response_seconds) ? `总响应 ${valueOrDash(item.total_response_seconds, 2)}s` : '暂无总响应数据'}</small></div></dl><button className="model-detail-toggle" onClick={() => toggleModelDetails(item.id)} aria-expanded={isExpanded}>{isExpanded ? '收起指标' : '展开全部指标'}</button></article>;
         })}</div>
         {totalPages > 1 && <nav className="ladder-pagination" aria-label="模型天梯分页"><button className="outline-button" onClick={() => changePage(currentPage - 1)} disabled={currentPage === 1}>上一页</button><div>{Array.from({ length: totalPages }, (_, index) => index + 1).map((item) => <button key={item} className={item === currentPage ? 'active' : ''} aria-current={item === currentPage ? 'page' : undefined} onClick={() => changePage(item)}>{item}</button>)}</div><button className="outline-button" onClick={() => changePage(currentPage + 1)} disabled={currentPage === totalPages}>下一页</button></nav>}

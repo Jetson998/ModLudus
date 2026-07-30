@@ -4,7 +4,7 @@ from typing import Any, Literal
 
 from fastapi import FastAPI, Header, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field
 
 from .trusted_season import SEASON_ID, TrustedSeasonRuntime
 from .ladder import LadderService
@@ -23,11 +23,7 @@ app.add_middleware(
 )
 trusted_runtime = TrustedSeasonRuntime.from_environment()
 ladder_service = LadderService.from_environment()
-
-
-class EndpointProbe(BaseModel):
-    api_base_url: HttpUrl
-    api_key: str = Field(min_length=1)
+anonymous_contributions_enabled = os.environ.get("MODLUDUS_ENABLE_ANONYMOUS_CONTRIBUTIONS", "false").lower() == "true"
 
 
 class ReviewDecisionInput(BaseModel):
@@ -77,6 +73,8 @@ def refresh_model_ladder(source: Literal["openrouter", "artificial-analysis"]) -
 
 @app.post("/api/v1/ladder/community-evaluations")
 def record_community_evaluation(payload: CommunityEvaluationInput) -> dict[str, Any]:
+    if not anonymous_contributions_enabled:
+        raise HTTPException(status_code=404, detail="anonymous community contributions are disabled")
     try:
         return ladder_service.record_community_evaluation(payload.event_id)
     except ValueError as error:
@@ -200,14 +198,3 @@ def publish_trusted_season(
         )
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
-
-
-@app.post("/api/v1/endpoints/probe")
-def probe_endpoint(payload: EndpointProbe) -> dict[str, Any]:
-    # M0 only validates shape. Actual provider calls belong in the worker adapter.
-    return {
-        "status": "accepted",
-        "api_base_url": str(payload.api_base_url).rstrip("/"),
-        "models_path": "/v1/models",
-        "secret_received": bool(payload.api_key),
-    }

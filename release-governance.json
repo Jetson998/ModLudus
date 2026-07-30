@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "project": {
+    "id": "modludus",
+    "name": "ModLudus"
+  },
+  "adapter": {
+    "prepare": "scripts/release-prepare.sh",
+    "verify": "scripts/release-verify.sh",
+    "preflight": "scripts/release-preflight.sh",
+    "package": "scripts/release-package.sh",
+    "attest": "scripts/release-attest.sh",
+    "deploy": "scripts/release-deploy.sh",
+    "acceptance": "scripts/release-acceptance.sh",
+    "finalize": "scripts/release-finalize.sh",
+    "status": "scripts/release-status.sh",
+    "validate": "scripts/validate-release-governance.sh"
+  },
+  "evidence": {
+    "state_root": ".release-state",
+    "record_root": "deployment/release-records"
+  },
+  "risk_modes": {
+    "light": {
+      "required_gates": ["prepare", "release_record"],
+      "not_applicable_allowed": []
+    },
+    "release": {
+      "required_gates": ["prepare", "preflight_permissions", "repository_gate", "package_manifest", "ci_attestation_gate", "release_record"],
+      "not_applicable_allowed": []
+    },
+    "protected": {
+      "required_gates": ["prepare", "preflight_permissions", "repository_gate", "package_manifest", "ci_attestation_gate", "target_preflight", "apply_gate", "acceptance_gate", "release_record"],
+      "not_applicable_allowed": []
+    },
+    "enhanced": {
+      "required_gates": ["prepare", "preflight_permissions", "repository_gate", "package_manifest", "ci_attestation_gate", "target_preflight", "apply_gate", "acceptance_gate", "release_record"],
+      "not_applicable_allowed": []
+    }
+  },
+  "repository": {
+    "type": "git",
+    "remote": "origin",
+    "default_branch": "main",
+    "expected_remote": "https://github.com/Jetson998/ModLudus.git"
+  },
+  "package": {
+    "always_include": [
+      "release-governance.json",
+      "docker-compose.prod.yml",
+      "deployment/nginx/modludus-http.conf",
+      "deployment/nginx/modludus.conf",
+      "deployment/server/apply-release.sh"
+    ]
+  },
+  "deployment": {
+    "allowed_runner_roots": ["deployment/server"],
+    "scoped_marker": "release-governance:scoped-deployment",
+    "default_target": "root@152.32.172.162",
+    "default_domain": "modludus.152.32.172.162.sslip.io"
+  }
+}

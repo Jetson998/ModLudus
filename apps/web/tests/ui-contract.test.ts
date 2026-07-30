@@ -9,6 +9,7 @@ const evaluation = readFileSync(new URL('../app/model-evaluation.tsx', import.me
 const shell = readFileSync(new URL('../app/app-shell.tsx', import.meta.url), 'utf8');
 const icon = readFileSync(new URL('../app/icon.svg', import.meta.url), 'utf8');
 const homeNav = readFileSync(new URL('../app/home-section-nav.tsx', import.meta.url), 'utf8');
+const communityMetrics = readFileSync(new URL('../app/community-metrics.ts', import.meta.url), 'utf8');
 
 test('purple-white design tokens are semantic and legacy theme aliases are removed', () => {
   assert.match(css, /--accent:\s*#7b22f6/);
@@ -43,10 +44,10 @@ test('ladder exposes country filtering, five product sorting categories, and tra
   assert.match(ladder, /国家仅按模型厂商所属地筛选，不参与评分或排名加权/);
   assert.match(css, /\.country-filters\s*\{/);
   assert.doesNotMatch(ladder, /\['speed', '高速度'\]|\['latency', '低延迟'\]/);
-  assert.match(ladder, /\['intelligence', '综合质量'\], \['quality-speed', '质量＋速度'\], \['quality-latency', '质量＋低延迟'\]/);
+  assert.doesNotMatch(ladder, /综合质量|质量＋速度|质量＋低延迟|quality-modes/);
   assert.match(ladder, /AA Intelligence 归一化占 85%/);
   assert.match(ladder, /排除价格为 0、缺失或无有效质量数据的模型/);
-  assert.match(css, /\.quality-modes\s*\{/);
+  assert.doesNotMatch(css, /\.quality-modes\s*\{/);
   assert.match(css, /@media \(max-width: 430px\)[\s\S]*\.ladder-presets\s*\{\s*grid-template-columns:\s*repeat\(2/);
 });
 
@@ -92,6 +93,8 @@ test('privacy copy states the local-only boundary and recommends a dedicated tes
   assert.match(evaluation, /建议使用测试专用 Key/);
   assert.match(evaluation, /凭据仅在当前页面内存中用于直连请求，刷新后清空/);
   assert.match(css, /\.credential-safety-note\s*\{/);
+  assert.match(communityMetrics, /NEXT_PUBLIC_ENABLE_ANONYMOUS_CONTRIBUTIONS === 'true'/);
+  assert.match(communityMetrics, /if \(!anonymousContributionsEnabled\) return false/);
 });
 
 test('batch evaluation is marked coming soon while quick evaluation remains usable', () => {

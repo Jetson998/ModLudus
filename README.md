@@ -57,6 +57,32 @@ npm --prefix apps/web run dev
 
 打开 <http://localhost:3000>。页面已经支持浏览器直连 OpenAI-compatible 网关、读取模型、并行生成和独立裁判。
 
+## 单机生产部署
+
+生产环境使用 `docker-compose.prod.yml`，只启动当前实际使用的 Web、API、Worker 和持久证据卷。Web 与 API 仅绑定服务器回环地址，由宿主机 Nginx 提供 HTTPS；PostgreSQL、Redis 和 MinIO 等尚未接入当前运行路径的组件不会随首版公网服务启动。
+
+默认生产隐私边界：
+
+- 前端构建使用同源 `/api`，普通竞技的 Base URL、API Key、题目和答案仍由浏览器直接发送到模型供应商。
+- 服务端不提供接收用户 API Key 的探测端点。
+- 匿名社区运行计数默认关闭；需要后续明确的用户授权与产品开关才能启用。
+- 可信赛季继续使用服务器管理员单独配置的凭据，并保持 `MODLUDUS_LOCAL_E2E_BYPASS=false`。
+
+仓库内的发布入口为：
+
+```bash
+scripts/release-prepare.sh
+scripts/release-verify.sh
+scripts/release-package.sh
+scripts/release-attest.sh
+scripts/release-preflight.sh
+MODLUDUS_DEPLOY_CONFIRM="$(git rev-parse HEAD)" scripts/release-deploy.sh
+scripts/release-acceptance.sh
+scripts/release-finalize.sh
+```
+
+发布脚本默认目标是 `root@152.32.172.162`，默认域名是 `modludus.152.32.172.162.sslip.io`；可通过 `MODLUDUS_DEPLOY_TARGET` 和 `MODLUDUS_DOMAIN` 显式覆盖。生产镜像在本地构建为 `linux/amd64` 并上传，服务器不会现场编译源码。部署目录为 `/opt/modludus/releases/<commit>`，稳定密钥保存在权限为 `0600` 的 `/opt/modludus/shared/secrets.env`，升级前会创建并验证可信证据备份。
+
 M3.1 批量实验室复用快速竞技区的网关和裁判配置。测试集文件通过浏览器读取，支持取消、题目并发 1–4 和脱敏检查点恢复。恢复后仍需重新提供测试集、Base URL 和 Key。
 
 M3.2 可信赛季控制台调用 ModLudus API，由服务器使用部署时配置的模型凭据执行固定赛季。运行证据保存在挂载的 `evidence_data` 卷；模型输出与 Prompt 原文不进入签名报告，只记录哈希、评分、Token、延迟、成本和失败类型。
