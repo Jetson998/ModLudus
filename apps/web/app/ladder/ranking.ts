@@ -7,7 +7,7 @@ export type RankingModel = {
 };
 
 export type QualityMode = 'intelligence' | 'quality-speed' | 'quality-latency';
-export type RankingView = 'quality' | 'cost' | 'value' | 'latest';
+export type RankingView = 'quality' | 'cost' | 'value' | 'speed' | 'latest';
 
 const positive = (value?: number | null) => Number.isFinite(value) && Number(value) > 0;
 
@@ -22,6 +22,7 @@ function normalize(value: number, minimum: number, maximum: number) {
 export function eligibleForView(model: RankingModel, view: RankingView, qualityMode: QualityMode) {
   if (view === 'cost') return positive(model.combined_price_per_million);
   if (view === 'value') return positive(model.quality) && positive(model.combined_price_per_million);
+  if (view === 'speed') return positive(model.speed_tokens_per_second);
   if (view !== 'quality') return true;
   if (!positive(model.quality)) return false;
   if (qualityMode === 'quality-speed') return positive(model.speed_tokens_per_second);

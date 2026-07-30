@@ -28,3 +28,9 @@ test('quality submodes require their measured secondary metric', () => {
   assert.equal(eligibleForView(incomplete, 'quality', 'quality-speed'), false);
   assert.equal(eligibleForView(incomplete, 'quality', 'quality-latency'), false);
 });
+
+test('speed view requires a measured positive output speed', () => {
+  assert.equal(eligibleForView(models[0], 'speed', 'intelligence'), true);
+  assert.equal(eligibleForView({ id: 'missing-speed', quality: 50 }, 'speed', 'intelligence'), false);
+  assert.equal(eligibleForView({ id: 'zero-speed', speed_tokens_per_second: 0 }, 'speed', 'intelligence'), false);
+});

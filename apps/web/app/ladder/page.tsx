@@ -6,7 +6,8 @@ import type { ReactNode } from 'react';
 import { buildRankingScores, eligibleForView } from './ranking';
 import type { QualityMode } from './ranking';
 
-type View = 'quality' | 'cost' | 'value' | 'latest';
+type View = 'quality' | 'cost' | 'value' | 'speed' | 'latest';
+type Country = 'china' | 'usa' | 'france' | 'canada' | 'uk' | 'israel' | 'other' | 'all';
 type SourceName = 'openrouter' | 'artificial-analysis';
 
 type SourceStatus = {
@@ -60,7 +61,8 @@ type RefreshResult = {
 
 const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
 const PAGE_SIZE = 20;
-const views: Array<[View, string]> = [['quality', '质量优先'], ['cost', '低成本'], ['value', '性价比'], ['latest', '新上架']];
+const views: Array<[View, string]> = [['quality', '质量优先'], ['cost', '低价'], ['value', '性价比'], ['speed', '快速'], ['latest', '新上架']];
+const countries: Array<[Country, string]> = [['china', '🇨🇳 中国'], ['usa', '🇺🇸 美国'], ['france', '🇫🇷 法国'], ['canada', '🇨🇦 加拿大'], ['uk', '🇬🇧 英国'], ['israel', '🇮🇱 以色列'], ['other', '🌍 其他'], ['all', '全部']];
 const qualityModes: Array<[QualityMode, string]> = [['intelligence', '综合质量'], ['quality-speed', '质量＋速度'], ['quality-latency', '质量＋低延迟']];
 
 function formatTime(value?: string | null) {
@@ -91,6 +93,17 @@ function compareNullable(a?: number | null, b?: number | null, direction: 'asc' 
   return direction === 'asc' ? Number(a) - Number(b) : Number(b) - Number(a);
 }
 
+function providerCountry(model: Pick<LadderModel, 'provider' | 'id'>): Exclude<Country, 'all'> {
+  const owner = `${model.provider} ${model.id.split('/', 1)[0]}`.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (['qwen', 'alibaba', 'deepseek', 'moonshot', 'moonshotai', 'minimax', 'tencent', 'xiaomi', 'zai', 'zhipu', 'baidu', 'bytedance', 'stepfun', '01ai'].some((key) => owner.includes(key))) return 'china';
+  if (['openai', 'anthropic', 'google', 'meta', 'xai', 'microsoft', 'amazon', 'aws', 'nvidia', 'arcee', 'inception', 'poolside', 'thinkingmachines', 'perplexity', 'nousresearch'].some((key) => owner.includes(key))) return 'usa';
+  if (owner.includes('mistral')) return 'france';
+  if (owner.includes('cohere')) return 'canada';
+  if (['stabilityai', 'stability'].some((key) => owner.includes(key))) return 'uk';
+  if (['ai21', 'a21labs'].some((key) => owner.includes(key))) return 'israel';
+  return 'other';
+}
+
 const providerLogos: Record<string, string> = {
   openai: 'openai.svg', anthropic: 'anthropic.svg', google: 'google-color.svg', xai: 'xai.svg', meta: 'meta-color.svg',
   qwen: 'qwen-color.svg', alibaba: 'alibaba-color.svg', deepseek: 'deepseek-color.svg', moonshotai: 'kimi-color.svg',
@@ -119,6 +132,7 @@ function SourceCard({ source, tone, title, meta, defaultOpen = false, children }
 
 export default function LadderPage() {
   const [view, setView] = useState<View>('quality');
+  const [country, setCountry] = useState<Country>('all');
   const [qualityMode, setQualityMode] = useState<QualityMode>('intelligence');
   const [payload, setPayload] = useState<LadderPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -146,7 +160,7 @@ export default function LadderPage() {
   useEffect(() => {
     setPage(1);
     setExpandedModels([]);
-  }, [qualityMode, search, view]);
+  }, [country, qualityMode, search, view]);
 
   async function refreshSource(source: SourceName) {
     setUpdating(source);
@@ -179,16 +193,17 @@ export default function LadderPage() {
     const query = search.trim().toLowerCase();
     const allModels = payload?.models ?? [];
     const scores = buildRankingScores(allModels);
-    const models = allModels.filter((item) => eligibleForView(item, view, qualityMode) && (!query || `${item.model} ${item.provider} ${item.id}`.toLowerCase().includes(query)));
+    const models = allModels.filter((item) => (country === 'all' || providerCountry(item) === country) && eligibleForView(item, view, qualityMode) && (!query || `${item.model} ${item.provider} ${item.id}`.toLowerCase().includes(query)));
     return models.sort((a, b) => {
       if (view === 'latest') return b.created - a.created;
       if (view === 'quality' && qualityMode === 'quality-speed') return compareNullable(scores.qualitySpeed.get(a.id), scores.qualitySpeed.get(b.id));
       if (view === 'quality' && qualityMode === 'quality-latency') return compareNullable(scores.qualityLatency.get(a.id), scores.qualityLatency.get(b.id));
       if (view === 'quality') return compareNullable(a.quality, b.quality);
       if (view === 'cost') return compareNullable(a.combined_price_per_million, b.combined_price_per_million, 'asc');
+      if (view === 'speed') return compareNullable(a.speed_tokens_per_second, b.speed_tokens_per_second);
       return compareNullable(scores.value.get(a.id), scores.value.get(b.id));
     });
-  }, [payload, qualityMode, search, view]);
+  }, [country, payload, qualityMode, search, view]);
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -228,6 +243,7 @@ export default function LadderPage() {
     <p className="status-message ladder-status" aria-live="polite">{loading ? '正在整理模型榜单与价格快照…' : statusMessage}</p>
 
     <section id="ladder-results" className="ladder-workbench">
+      <div className="country-filters" role="group" aria-label="按模型厂商所属国家筛选">{countries.map(([value, label]) => <button key={value} aria-pressed={country === value} className={country === value ? 'active' : ''} onClick={() => setCountry(value)}>{label}</button>)}</div>
       <div className="ladder-toolbar"><div className="ladder-controls"><div className="ladder-presets" role="group" aria-label="天梯排序方式">{views.map(([value, label]) => <button key={value} aria-pressed={view === value} className={view === value ? 'active' : ''} onClick={() => setView(value)}>{label}</button>)}</div><input aria-label="搜索模型" className="ladder-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索模型、厂商或 Model ID" /></div><span>{sorted.length ? `显示 ${pageStart + 1}–${pageStart + displayed.length}/${sorted.length}` : '显示 0/0'} · 当前排序：{view === 'quality' ? qualityModes.find(([value]) => value === qualityMode)?.[1] : views.find(([value]) => value === view)?.[1]}</span></div>
       {view === 'quality' && <div className="quality-modes" role="group" aria-label="质量优先细分">{qualityModes.map(([value, label]) => <button key={value} aria-pressed={qualityMode === value} className={qualityMode === value ? 'active' : ''} onClick={() => setQualityMode(value)}>{label}</button>)}</div>}
       {loading ? <div className="ladder-skeleton" aria-label="正在加载模型榜单">{Array.from({ length: 6 }, (_, index) => <div key={index}><span /><span /><span /><span /></div>)}</div> : displayed.length ? <>
@@ -242,7 +258,7 @@ export default function LadderPage() {
         })}</div>
         {totalPages > 1 && <nav className="ladder-pagination" aria-label="模型天梯分页"><button className="outline-button" onClick={() => changePage(currentPage - 1)} disabled={currentPage === 1}>上一页</button><div>{Array.from({ length: totalPages }, (_, index) => index + 1).map((item) => <button key={item} className={item === currentPage ? 'active' : ''} aria-current={item === currentPage ? 'page' : undefined} onClick={() => changePage(item)}>{item}</button>)}</div><button className="outline-button" onClick={() => changePage(currentPage + 1)} disabled={currentPage === totalPages}>下一页</button></nav>}
       </> : <div className="ladder-empty"><strong>暂无可展示模型</strong><p>请先更新 OpenRouter 模型目录；Artificial Analysis 更新用于补充质量、速度和延迟指标。</p></div>}
-      <p className="ladder-disclaimer">性价比采用质量优先型综合分：AA Intelligence 归一化占 85%，OpenRouter 输入＋输出参考价的对数归一化占 15%；不会按厂商或国家加分。低成本与性价比均排除价格为 0、缺失或无有效质量数据的模型。质量优先可按综合质量、质量＋速度、质量＋低延迟拆分；外部指标不与 ModLudus 真实业务分数直接平均。</p>
+      <p className="ladder-disclaimer">国家仅按模型厂商所属地筛选，不参与评分或排名加权，也不代表 API 节点或数据存储地。性价比采用质量优先型综合分：AA Intelligence 归一化占 85%，OpenRouter 输入＋输出参考价的对数归一化占 15%；低价与性价比均排除价格为 0、缺失或无有效质量数据的模型。</p>
     </section>
   </main>;
 }

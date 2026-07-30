@@ -36,8 +36,12 @@ test('ladder sources use compact expandable cards on desktop and mobile', () => 
   assert.match(css, /@media \(max-width: 760px\)[\s\S]*\.ladder-sources summary/);
 });
 
-test('ladder exposes four product sorting categories, quality submodes, and transparent value ranking', () => {
-  assert.match(ladder, /\['quality', '质量优先'\], \['cost', '低成本'\], \['value', '性价比'\], \['latest', '新上架'\]/);
+test('ladder exposes country filtering, five product sorting categories, and transparent value ranking', () => {
+  assert.match(ladder, /\['quality', '质量优先'\], \['cost', '低价'\], \['value', '性价比'\], \['speed', '快速'\], \['latest', '新上架'\]/);
+  assert.match(ladder, /\['china', '🇨🇳 中国'\], \['usa', '🇺🇸 美国'\]/);
+  assert.match(ladder, /country === 'all' \|\| providerCountry\(item\) === country/);
+  assert.match(ladder, /国家仅按模型厂商所属地筛选，不参与评分或排名加权/);
+  assert.match(css, /\.country-filters\s*\{/);
   assert.doesNotMatch(ladder, /\['speed', '高速度'\]|\['latency', '低延迟'\]/);
   assert.match(ladder, /\['intelligence', '综合质量'\], \['quality-speed', '质量＋速度'\], \['quality-latency', '质量＋低延迟'\]/);
   assert.match(ladder, /AA Intelligence 归一化占 85%/);
