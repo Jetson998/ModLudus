@@ -218,7 +218,14 @@ export default function LadderPage() {
   }
 
   return <main className="product-page ladder-page">
-    <section className="page-heading"><div><span className="eyebrow">智能选型榜</span><h1>模型天梯</h1><p>OpenRouter 提供当前模型目录与价格，Artificial Analysis 提供横向质量和性能快照，ModLudus 标准评测补充真实业务证据。</p></div><Link href="/evaluations" className="primary-button">用真实任务评测 <span>→</span></Link></section>
+    <section className="evaluation-heading ladder-heading">
+      <div className="ladder-heading-copy">
+        <nav className="evaluation-breadcrumb" aria-label="面包屑"><Link href="/">首页</Link><span>/</span><strong>模型天梯</strong></nav>
+        <div className="evaluation-title-line"><h1>模型天梯</h1><span>智能选型榜</span></div>
+        <p className="ladder-heading-description">OpenRouter 提供模型目录与参考价格，Artificial Analysis 补充质量和性能快照，ModLudus 标准评测提供真实业务证据。</p>
+      </div>
+      <Link href="/evaluations" className="primary-button">用真实任务评测 <span>→</span></Link>
+    </section>
 
     <section className="ladder-sources" aria-label="天梯数据来源">
       <SourceCard source="artificial-analysis" tone="external" title="Artificial Analysis" meta={`快照 ${formatTime(artificialStatus?.captured_at)} · ${artificialStatus?.item_count ?? 0} 个模型`} defaultOpen>

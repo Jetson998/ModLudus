@@ -61,6 +61,15 @@ test('ladder shows provider logos, removes the evidence column, and uses the com
   assert.match(css, /repeat\(4,minmax\(100px,\.7fr\)\)/);
 });
 
+test('ladder reuses the compact evaluation title rhythm', () => {
+  assert.match(ladder, /className="evaluation-heading ladder-heading"/);
+  assert.match(ladder, /<h1>模型天梯<\/h1><span>智能选型榜<\/span>/);
+  assert.match(ladder, /className="ladder-heading-description"/);
+  assert.match(css, /\.ladder-heading\s*\{[^}]*align-items:\s*flex-end/s);
+  assert.match(css, /\.ladder-heading-description\s*\{[^}]*font-size:\s*13px/s);
+  assert.match(css, /@media \(max-width: 760px\)[\s\S]*?\.ladder-heading\s*\{[\s\S]*?flex-direction:\s*column/s);
+});
+
 test('ladder bounds long lists with pagination and collapsible mobile metrics', () => {
   assert.match(ladder, /const PAGE_SIZE = 20/);
   assert.match(ladder, /sorted\.slice\(pageStart, pageStart \+ PAGE_SIZE\)/);
@@ -86,7 +95,7 @@ test('home uses optional anchor navigation without mandatory scroll snapping', (
 test('privacy copy states the local-only boundary and recommends a dedicated test key', () => {
   assert.match(home, /浏览器隐私模式/);
   assert.match(home, /全程浏览器本地评分，API Key、测评任务仅直连模型厂商 API，不经任何三方服务器、不做任何留存/);
-  assert.match(evaluation, /单次对比用于快速判断，批量评测即将上线。/);
+  assert.match(evaluation, /<h1>模型评测<\/h1><span>快速选型工作台<\/span>/);
   assert.doesNotMatch(evaluation, /● 当前浏览器隐私模式|Key、任务和答案默认不离开浏览器/);
   assert.match(evaluation, /<strong>🔒 浏览器隐私模式<\/strong>/);
   assert.match(evaluation, /模型编排、评分汇总、结果渲染，全程在您的浏览器本地完成，全程仅加密直连模型厂商/);
@@ -97,49 +106,109 @@ test('privacy copy states the local-only boundary and recommends a dedicated tes
   assert.match(communityMetrics, /if \(!anonymousContributionsEnabled\) return false/);
 });
 
-test('batch evaluation is marked coming soon while quick evaluation remains usable', () => {
-  assert.match(evaluation, /批量评测 <small>即将上线<\/small>/);
-  assert.match(evaluation, /className="mode-coming-soon" disabled/);
+test('evaluation page stays focused on the usable quick workflow', () => {
+  assert.doesNotMatch(evaluation, /批量评测即将上线|className="mode-coming-soon"/);
   assert.doesNotMatch(evaluation, /import BatchLab/);
   assert.doesNotMatch(evaluation, /setEvaluationMode\('batch'\)/);
   assert.match(home, /coming-soon-label">即将上线/);
 });
 
-test('quick evaluation supports searchable models and expandable long answers', () => {
-  assert.match(evaluation, /搜索发现的模型/);
-  assert.match(evaluation, /slice\(0, 50\)/);
+test('quick evaluation uses a searchable model picker dialog and expandable long answers', () => {
+  assert.match(evaluation, /选择候选模型/);
+  assert.match(evaluation, /slice\(0, 80\)/);
   assert.match(evaluation, /已选 \{selectedModels\.length\} 个/);
+  assert.match(evaluation, /role="dialog" aria-modal="true"/);
+  assert.match(evaluation, /openModelPicker\('candidate', connection\.id\)/);
+  assert.match(evaluation, /aria-label="搜索可用模型"/);
   assert.match(evaluation, /展开完整答案/);
-  assert.match(css, /\.model-picker-list\s*\{[^}]*max-height:/s);
+  assert.match(css, /\.model-picker-options\s*\{[^}]*overflow-y:\s*auto/s);
   assert.match(css, /\.result-card pre\.expanded\s*\{[^}]*max-height:\s*none/s);
 });
 
+test('quick evaluation auto-discovers models and gives candidate and judge matching picker controls', () => {
+  assert.match(evaluation, /window\.setTimeout\(\(\) => void loadModels\(connection, signature\), 450\)/);
+  assert.match(evaluation, /填写 Base URL 和 Key 后自动读取模型/);
+  assert.doesNotMatch(evaluation, />发现模型<\/button>/);
+  assert.match(evaluation, /className="model-select-trigger"[\s\S]*openModelPicker\('candidate'/);
+  assert.match(evaluation, /className="model-select-trigger judge-select-trigger"[\s\S]*openModelPicker\('judge'/);
+  assert.doesNotMatch(evaluation, /<select aria-label="评审模型"/);
+  assert.doesNotMatch(evaluation, /<input aria-label="评审 Model ID"/);
+  assert.match(evaluation, /connection-add-button[\s\S]*添加其他网关/);
+  assert.doesNotMatch(evaluation, /添加模型来源/);
+});
+
+test('completed candidates open a dedicated result view with judge recovery', () => {
+  assert.match(evaluation, /if \(successful\.length\) \{[\s\S]*setEvaluationView\('results'\)/);
+  assert.match(evaluation, /setRunPhase\('judging'\)[\s\S]*setStatusMessage\('正在进行独立裁决，请保持页面开启。'\)[\s\S]*setEvaluationView\('results'\)/);
+  assert.match(evaluation, /runPhase === 'judging' \? '候选测评完成'/);
+  assert.match(evaluation, /所有候选模型均未返回有效结果/);
+  assert.match(evaluation, /<h1>测评完成<\/h1>/);
+  assert.match(evaluation, /返回修改并重测/);
+  assert.match(evaluation, /候选结果已完成，自动裁判暂未完成/);
+  assert.match(evaluation, /结果页评审模型/);
+  assert.match(evaluation, /void retryJudge\(\)/);
+  assert.match(evaluation, /failedCandidates = results\.filter\(\(item\) => item\.failed\)/);
+  assert.match(evaluation, /results\.map\(\(item\) => retriedByAlias\.get\(item\.alias\) \?\? item\)/);
+  assert.match(evaluation, /成功候选不会重复调用/);
+  assert.match(evaluation, /重试未完成候选并重新评审/);
+});
+
 test('quick evaluation makes long-running work visible, bounded, and cancellable', () => {
-  assert.match(evaluation, /● 运行中 · \$\{runSeconds\} 秒/);
+  assert.doesNotMatch(evaluation, /● 运行中 · \$\{runSeconds\} 秒/);
   assert.match(evaluation, /候选生成 \$\{completedCandidates\}\/\$\{candidateCount\}/);
-  assert.match(evaluation, /单个调用超过 120 秒会自动超时/);
+  assert.match(evaluation, /CANDIDATE_REQUEST_TIMEOUT_MS = 180_000/);
+  assert.match(evaluation, /JUDGE_REQUEST_TIMEOUT_MS = 180_000/);
+  assert.match(evaluation, /RUN_PHASE_TIMEOUT_SECONDS = 180/);
+  assert.match(evaluation, /PARTIAL_JUDGE_OFFER_AFTER_SECONDS = 90/);
+  assert.match(evaluation, /使用已完成结果立即裁决/);
+  assert.match(evaluation, /successfulCandidatesCompleted >= 2/);
+  assert.match(evaluation, /candidatePhaseControllerRef\.current\?\.abort\(\)/);
+  assert.match(evaluation, /\[runPhase, running\]/);
+  assert.match(evaluation, /运行中 · 剩余 \$\{phaseRemainingSeconds\}s/);
+  assert.match(evaluation, /候选模型仍在生成；每个候选的硬超时仍为 180 秒/);
+  assert.match(evaluation, /裁判正在读取全部候选答案并评分，本阶段最长等待 180 秒/);
   assert.match(evaluation, /取消评测/);
+  assert.match(evaluation, /candidate-progress-track/);
+  assert.match(evaluation, /参考价读取失败，暂不显示成本。/);
+  assert.doesNotMatch(evaluation, /<div className="privacy-panel"><strong>🔒 浏览器隐私模式/);
   assert.match(css, /\.running-status\s*\{/);
+  assert.match(css, /\.partial-judge-offer\s*\{/);
   assert.match(css, /\.run-button\.running:disabled/);
   assert.match(css, /@keyframes run-spin/);
+});
+
+test('auxiliary requests do not extend the model evaluation critical path', () => {
+  assert.match(evaluation, /PRICE_WAIT_TIMEOUT_MS = 2_500/);
+  assert.match(evaluation, /const runPricesPromise = loadRunPricesWithinBudget\(\)/);
+  assert.match(evaluation, /const runPrices = await runPricesPromise/);
+  assert.match(evaluation, /MODEL_DISCOVERY_TIMEOUT_MS = 12_000/);
+  assert.match(evaluation, /signal: controller\.signal/);
+  assert.match(evaluation, /void recordCommunityEvaluation\(\)\.then/);
+  assert.doesNotMatch(evaluation, /await recordCommunityEvaluation\(\)/);
+  assert.doesNotMatch(evaluation, /new Promise<void>\(\(resolve\) => window\.setTimeout\(resolve, 600\)\)/);
 });
 
 test('model calls omit temperature for providers that reject the parameter', () => {
   assert.match(evaluation, /Claude Opus 5/);
   assert.match(evaluation, /JSON\.stringify\(\{ model, messages: \[\{ role: 'user', content \}\] \}\)/);
   assert.doesNotMatch(evaluation, /JSON\.stringify\(\{ model, messages: \[\{ role: 'user', content \}\], temperature \}\)/);
+  assert.doesNotMatch(evaluation, /reasoning_effort:\s*['"]low['"]/);
   assert.match(evaluation, /providerMessage = typeof parsed\.error === 'string'/);
 });
 
 test('evaluation reuses the backend OpenRouter price snapshot', () => {
-  assert.match(evaluation, /fetch\(`\$\{apiBase\}\/api\/v1\/ladder`, \{ cache: 'no-store' \}\)/);
+  assert.match(evaluation, /fetch\(`\$\{apiBase\}\/api\/v1\/ladder`, \{ cache: 'no-store'(?:, signal)? \}\)/);
   assert.match(evaluation, /ModLudus OpenRouter 共享快照/);
-  assert.match(evaluation, /运行时估算/);
+  assert.match(evaluation, /按实际 Token 用量估算/);
   assert.doesNotMatch(evaluation, /fetch\('https:\/\/openrouter\.ai\/api\/v1\/models'\)/);
 });
 
 test('home hero uses the compact desktop type scale', () => {
-  assert.match(css, /\.home-hero h1\s*\{[^}]*font-size:\s*clamp\(50px,6vw,74px\)/);
+  assert.match(css, /\.home-hero-v2 h1\s*\{[^}]*font-size:\s*42px[^}]*letter-spacing:\s*0/);
+  assert.match(css, /\.product-page \.page-heading h1,[\s\S]*?font-size:\s*32px[^}]*letter-spacing:\s*0/);
+  assert.match(css, /\.evaluation-title-line h1\s*\{[^}]*font-size:\s*22px/);
+  assert.doesNotMatch(css, /\.home-hero-v2 h1\s*\{[^}]*font-size:\s*clamp/);
+  assert.match(css, /@media \(max-width: 760px\)[\s\S]*?\.product-page \.page-heading h1,[\s\S]*?font-size:\s*28px/);
   assert.match(css, /\.brand-mark\s*\{[^}]*border-radius:\s*50%[^}]*background:\s*linear-gradient/);
   assert.match(css, /\.brand-mark\s*\{[^}]*border:\s*0[^}]*color:\s*#f7ffff[^}]*text-shadow:/);
   assert.doesNotMatch(css, /\.brand-mark\s*\{[^}]*box-shadow:[^}]*inset/);
@@ -156,4 +225,22 @@ test('home hero uses the compact desktop type scale', () => {
   assert.match(css, /\.stroke-two-tip[^}]*animation:\s*mark-tip-in\s+\.16s[^}]*\.82s/);
   assert.match(css, /@media \(prefers-reduced-motion:\s*reduce\)[\s\S]*\.brand-mark \.mark-stroke[^}]*animation:\s*none/);
   assert.equal((icon.match(/<path d=/g) ?? []).length, 4);
+});
+
+test('home hero uses the concise model-evaluation copy', () => {
+  assert.match(home, /<h1>模型测评<br \/><em>让模型直接比一场。<\/em><\/h1>/);
+  assert.match(home, /同一道真实任务，多模型匿名并行生成，独立评审出可追溯的选型结论。/);
+  assert.doesNotMatch(home, /比较质量、成本与速度/);
+  assert.doesNotMatch(home, /不需要先研究 Rubric 或模型参数。选择场景后，ModLudus 会填入一道可直接运行的示例。/);
+});
+
+test('evaluation workflow headings share a fixed desktop baseline', () => {
+  assert.match(css, /\.wizard-sidebar-title,\s*\.evaluation-page \.wizard-title\s*\{[^}]*height:\s*46px[^}]*min-height:\s*46px[^}]*margin:\s*0 0 10px/s);
+  assert.match(css, /\.wizard-sidebar-title \.sidebar-kicker,\s*\.evaluation-page \.wizard-title \.section-kicker\s*\{[^}]*font-size:\s*11px[^}]*line-height:\s*1\.2/s);
+  assert.match(css, /\.wizard-sidebar-title strong\s*\{[^}]*font-size:\s*16px/);
+  assert.match(css, /\.evaluation-page \.wizard-title h2\s*\{[^}]*font-size:\s*18px/);
+  assert.match(css, /@media \(max-width: 760px\)[\s\S]*\.evaluation-page \.wizard-title\s*\{\s*height:\s*auto;\s*min-height:\s*0;/);
+  assert.match(css, /\.evaluation-page \.wizard-layout\s*\{[^}]*min-height:\s*calc\(100dvh - 165px\)[^}]*align-items:\s*stretch/s);
+  assert.match(css, /\.evaluation-page \.connections\s*\{[^}]*overflow:\s*visible/s);
+  assert.doesNotMatch(css, /\.evaluation-page \.connections\s*\{[^}]*overflow-y:\s*auto/s);
 });

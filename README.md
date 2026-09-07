@@ -6,8 +6,8 @@ ModLudus 是一个基于真实业务任务的多模型竞技与智能选型平�
 
 - 单轮文本任务：文案、代码、总结、数据分析
 - 用户可配置最多 6 个 OpenAI-compatible 网关，每个网关独立填写 Base URL、API Key 和模型
-- 通过 `GET /v1/models` 发现模型，也支持手工填写 Model ID
-- 读取到模型列表后可直接点击选择，无需复制 Model ID
+- 填写 Base URL 和 API Key 后自动调用 `GET /v1/models` 发现模型
+- 候选模型与独立评审模型均从可搜索弹窗中选择，无需复制 Model ID
 - 跨网关选择 2–6 个候选模型并行生成；总候选上限为 6
 - 单个候选调用失败不会终止整场竞技，失败项单独展示且不进入裁判
 - 输出匿名化，使用 Fisher–Yates 洗牌生成 A/B/C 位置
@@ -33,7 +33,7 @@ ModLudus 是一个基于真实业务任务的多模型竞技与智能选型平�
 ## 默认隐私模式
 
 - API Key、Base URL、测评题、参考答案、候选答案和裁判原文只保存在当前页面内存
-- M3.1 仅在当前标签页的 Session Storage 保存任务状态、Rubric 和脱敏后的评分/性能结果，用于刷新恢复
+- 单次对比只使用当前页面内存，刷新后清空；批量评测仅在当前标签页的 Session Storage 保存脱敏恢复点
 - 恢复点不写入 ModLudus API、数据库、日志、Cookie、Local Storage 或 IndexedDB，也不含题目或模型输出；网关一致性仅使用当前恢复点随机盐下的规范化 Base URL 哈希校验
 - 目标网关必须允许浏览器 CORS
 - 不支持 CORS 的网关后续使用用户本机临时代理，只转发、不持久化
@@ -58,6 +58,8 @@ npm --prefix apps/web run dev
 打开 <http://localhost:3000>。页面已经支持浏览器直连 OpenAI-compatible 网关、读取模型、并行生成和独立裁判。
 
 ## 单机生产部署
+
+运维交接、环境变量、验收与回滚边界见 [运维部署交接](docs/OPERATIONS_DEPLOYMENT.md)。
 
 生产环境使用 `docker-compose.prod.yml`，只启动当前实际使用的 Web、API、Worker 和持久证据卷。Web 与 API 仅绑定服务器回环地址，由宿主机 Nginx 提供 HTTPS；PostgreSQL、Redis 和 MinIO 等尚未接入当前运行路径的组件不会随首版公网服务启动。
 

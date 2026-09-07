@@ -12,8 +12,8 @@ export default function Home() {
     <section id="selection" className="home-hero-v2">
       <div className="home-hero-copy">
         <span className="home-pill"><i /> 基于真实业务任务</span>
-        <h1>别再猜哪个模型更好。<br /><em>让它们直接比一场。</em></h1>
-        <p>同一道真实任务，多模型匿名并行生成，独立评审比较质量、成本与速度，最后给出可追溯的选型结论。</p>
+        <h1>模型测评<br /><em>让模型直接比一场。</em></h1>
+        <p>同一道真实任务，多模型匿名并行生成，独立评审出可追溯的选型结论。</p>
         <div className="hero-actions"><Link href="/evaluations" className="primary-button">开始一次真实评测 <span>→</span></Link><Link href="/ladder" className="home-secondary-link">先看模型天梯 <span>↗</span></Link></div>
         <div className="home-proof-row"><span><strong>2–6</strong>候选模型</span><span><strong>1</strong>独立自动评审</span><span><strong>0</strong>敏感数据留存</span></div><span className="sr-only">继续浏览</span>
       </div>
@@ -33,7 +33,7 @@ export default function Home() {
     <section className="home-trust-strip" aria-label="浏览器隐私模式：全程浏览器本地评分，API Key、测评任务仅直连模型厂商 API，不经任何三方服务器、不做任何留存"><div><span className="trust-icon">◇</span><p><strong>Key 只在当前页面使用</strong><small>不上传、不入库</small></p></div><div><span className="trust-icon">◎</span><p><strong>任务与答案不留存</strong><small>刷新页面即清空</small></p></div><div><span className="trust-icon">↗</span><p><strong>浏览器直连模型网关</strong><small>ModLudus 不中转你的业务内容</small></p></div></section>
 
     <section id="scenarios" className="home-section-v2 home-scenarios-v2">
-      <div className="home-section-heading-v2"><div><span>从这里开始</span><h2>选一道你真的会用到的题</h2></div><p>不需要先研究 Rubric 或模型参数。选择场景后，ModLudus 会填入一道可直接运行的示例。</p></div>
+      <div className="home-section-heading-v2"><div><span>从这里开始</span><h2>选一道你真的会用到的题</h2></div></div>
       <div className="home-scenario-bento">{scenarios.map((item, index) => <Link className={`home-scenario-v2 ${item.tone}`} href={`/evaluations?scenario=${encodeURIComponent(item.label)}&example=1`} key={item.label}><span className="scenario-mark">{item.mark}</span><span className="scenario-index">0{index + 1}</span><div><strong>{item.label}</strong><p>{item.hint}</p></div><em>使用示例 <span>→</span></em></Link>)}</div>
     </section>
 
