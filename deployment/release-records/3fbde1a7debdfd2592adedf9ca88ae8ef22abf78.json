@@ -1,0 +1,15 @@
+{
+  "schema": "modludus-release-record-v1",
+  "status": "succeeded",
+  "source_revision": "3fbde1a7debdfd2592adedf9ca88ae8ef22abf78",
+  "target": "root@152.32.172.162",
+  "public_url": "https://modludus.152.32.172.162.sslip.io/",
+  "artifact_digest": "490ff5536e8fb260d64909d68544e947e66e60a2356fbcb2243e346584432317",
+  "runtime_snapshot": "/opt/modludus/release-records/3fbde1a7debdfd2592adedf9ca88ae8ef22abf78.json",
+  "previous_release": "/opt/modludus/releases/15b057b7265782f1464921a90b053219bac34f49",
+  "backup_reference": "/opt/modludus/backups/modludus-3fbde1a7debdfd2592adedf9ca88ae8ef22abf78-before.zip",
+  "backup_sha256": "1a5ce4ea15bbb4126a55cebb231adedc3dd45da619a357a8ccac6e92a7f002e4",
+  "nginx_backup_reference": "/opt/modludus/backups/nginx-modludus-before-3fbde1a7debdfd2592adedf9ca88ae8ef22abf78.conf",
+  "acceptance_result": "passed",
+  "completed_at": "2026-09-07T14:31:58.362266+00:00"
+}
